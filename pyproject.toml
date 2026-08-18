@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seekora-agent"
+version = "0.7.0"
+description = "A grounded search and recommendation agent baseline"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "langchain>=1.3,<2",
+  "langchain-openai>=1.1,<2",
+  "langgraph>=1.2,<2",
+  "pydantic-settings>=2.6,<3",
+  "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.27,<1"]
+
+[project.scripts]
+seekora-agent = "seekora_agent.interfaces.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+seekora_agent = ["interfaces/http/static/*"]

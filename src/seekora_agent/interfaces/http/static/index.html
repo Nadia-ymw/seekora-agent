@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="基于 LangChain 与 DeepSeek 的搜索推荐 Agent 测试台">
+  <title>Seekora Agent · 智能搜索推荐</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="会话侧栏">
+      <div class="brand-row">
+        <div class="brand-mark" aria-hidden="true">N</div>
+        <div>
+          <div class="brand-name">Seekora</div>
+          <div class="brand-caption">Search intelligence</div>
+        </div>
+        <button class="icon-button sidebar-close" id="sidebarClose" type="button" aria-label="关闭侧栏">×</button>
+      </div>
+
+      <button class="new-chat" id="newChat" type="button">
+        <span aria-hidden="true">＋</span>
+        <span>新建对话</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+
+      <div class="sidebar-section">
+        <div class="section-label">快捷测试</div>
+        <button class="history-item prompt-shortcut" type="button" data-prompt="推荐一款8000元以内、16GB内存以上，适合编程的轻薄本">
+          <span class="history-icon" aria-hidden="true">⌁</span>
+          <span>编程轻薄本推荐</span>
+        </button>
+        <button class="history-item prompt-shortcut" type="button" data-prompt="帮我找一款重量1.5kg以内、续航10小时以上的笔记本">
+          <span class="history-icon" aria-hidden="true">⌁</span>
+          <span>便携长续航筛选</span>
+        </button>
+        <button class="history-item prompt-shortcut" type="button" data-prompt="有哪些高性能游戏本值得推荐？">
+          <span class="history-icon" aria-hidden="true">⌁</span>
+          <span>高性能游戏本</span>
+        </button>
+      </div>
+
+      <div class="sidebar-spacer"></div>
+      <div class="connection-card">
+        <div class="connection-topline">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="serviceStatus">正在连接服务</span>
+        </div>
+        <div class="connection-model" id="sidebarModel">读取模型配置…</div>
+      </div>
+      <div class="sidebar-footer">本地测试台 · 数据不会离开当前服务</div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menuButton" type="button" aria-label="打开侧栏">☰</button>
+        <div class="title-group">
+          <span class="page-title">搜索推荐 Agent</span>
+          <span class="beta-pill">BETA</span>
+        </div>
+        <div class="topbar-actions">
+          <div class="model-pill" title="当前后端解析器">
+            <span class="model-spark" aria-hidden="true">✦</span>
+            <span id="modelName">连接中</span>
+          </div>
+          <button class="icon-button" id="clearButton" type="button" aria-label="清空对话" title="清空对话">↺</button>
+        </div>
+      </header>
+
+      <section class="conversation" id="conversation" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <div class="welcome-orbit" aria-hidden="true">
+            <div class="welcome-core">N</div>
+          </div>
+          <h1>今天想找点什么？</h1>
+          <p>描述你的预算、偏好和硬性条件，我会解析意图、检索候选并给出可验证的推荐结果。</p>
+          <div class="suggestion-grid">
+            <button class="suggestion-card prompt-shortcut" type="button" data-prompt="推荐一款8000元以内、16GB内存以上，适合编程的轻薄本">
+              <span class="suggestion-icon violet" aria-hidden="true">⌁</span>
+              <span><strong>精准推荐</strong><small>8000 元内的编程轻薄本</small></span>
+              <span class="arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="suggestion-card prompt-shortcut" type="button" data-prompt="帮我找一款重量1.5kg以内、续航10小时以上的笔记本">
+              <span class="suggestion-icon mint" aria-hidden="true">◎</span>
+              <span><strong>约束筛选</strong><small>轻于 1.5kg 且续航 10 小时</small></span>
+              <span class="arrow" aria-hidden="true">↗</span>
+            </button>
+            <button class="suggestion-card prompt-shortcut" type="button" data-prompt="对比适合办公和适合游戏的笔记本，优先性价比">
+              <span class="suggestion-icon amber" aria-hidden="true">≋</span>
+              <span><strong>探索需求</strong><small>办公与游戏本的差异</small></span>
+              <span class="arrow" aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </div>
+        <div class="messages" id="messages"></div>
+      </section>
+
+      <footer class="composer-area">
+        <form class="composer" id="composer">
+          <textarea id="promptInput" rows="1" maxlength="4000" placeholder="向搜索推荐 Agent 描述你的需求…" aria-label="输入需求"></textarea>
+          <div class="composer-bottom">
+            <div class="composer-hints">
+              <span class="hint-chip">Fast Path</span>
+              <span>Enter 发送 · Shift + Enter 换行</span>
+            </div>
+            <button class="send-button" id="sendButton" type="submit" aria-label="发送消息">↑</button>
+            <button class="stop-button hidden" id="stopButton" type="button" aria-label="停止生成">■</button>
+          </div>
+        </form>
+        <div class="disclaimer">结果来自样例目录，仅用于验证模型调用、召回与约束链路。</div>
+      </footer>
+    </main>
+  </div>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

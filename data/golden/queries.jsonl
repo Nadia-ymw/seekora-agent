@@ -1,0 +1,5 @@
+{"query_id":"q-001","query":"适合编程的轻薄笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"lap-001":3,"lap-004":2}}
+{"query_id":"q-002","query":"便携学生办公轻薄本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":6000}],"relevance":{"lap-003":3}}
+{"query_id":"q-003","query":"高性能游戏独立显卡笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"lap-002":3}}
+{"query_id":"q-004","query":"长续航移动办公笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"battery_hours","operator":"gte","value":13}],"relevance":{"lap-001":3,"lap-003":2}}
+{"query_id":"q-005","query":"可以运行虚拟机的软件开发笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"memory_gb","operator":"gte","value":32}],"relevance":{"lap-004":3,"lap-001":1}}
