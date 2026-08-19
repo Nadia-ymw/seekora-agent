@@ -31,7 +31,7 @@ def encode_sse(event: AgentEvent) -> str:
 
 
 def create_app(runtime: AgentRuntime) -> FastAPI:
-    app = FastAPI(title="Seekora Agent", version="0.7.0")
+    app = FastAPI(title="Seekora Agent", version="0.8.0")
     app.state.runtime = runtime
     static_dir = Path(__file__).with_name("static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

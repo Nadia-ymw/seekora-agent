@@ -9,7 +9,7 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 支持中文的轻量 BM25 关键词基线；
 - 确定性结构化过滤；
 - Recall@K、MRR、NDCG@K 离线评测；
-- 固定样例数据、测试和基线报告生成入口。
+- 30 条、6 个品类的固定样例目录，15 条 Golden Query、测试和基线报告生成入口。
 - 单 Agent Fast Path 运行时、Session、执行预算和取消；
 - LangChain `catalog_search` 与 `vector_search` StructuredTool；
 - Recommendation Receipt；
@@ -21,6 +21,7 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 可选的 LangChain `ChatOpenAI` 结构化意图解析，以及失败时的规则回退。
 - 类 GPT 的同源 Web 测试台，可实时查看模型解析器、SSE 执行进度、结果和 Receipt。
 - 复杂度路由、Retrieval Probe、结构化计划和受预算约束的 Deep Path 多查询执行。
+- 结果充分性判断、最多一次 Replan、Fast Path 零结果升级以及可审计的澄清/拒答。
 
 开发文档入口见 [docs/README.md](docs/README.md)，实施计划见
 [docs/00-overview/implementation-plan.md](docs/00-overview/implementation-plan.md)。

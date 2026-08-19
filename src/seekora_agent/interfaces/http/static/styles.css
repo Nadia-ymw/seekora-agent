@@ -170,6 +170,10 @@ button { cursor: pointer; }
 .receipt-details summary { padding: 11px 0 0; color: #85878d; font-size: 10px; cursor: pointer; }
 .receipt-json { max-height: 220px; margin-top: 10px; padding: 12px; overflow: auto; color: #c6c8cf; background: #1d1e22; border-radius: 10px; font: 10px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 .error-card { margin-top: 12px; padding: 13px; color: #9c3e3e; background: #fff1f1; border: 1px solid #f5d5d5; border-radius: 12px; font-size: 11px; line-height: 1.6; }
+.decision-card { margin-top: 14px; padding: 14px 16px; color: #54430b; background: #fffbea; border: 1px solid #d9c98f; border-radius: 12px; }
+.decision-card.refuse { color: #6e2424; background: #fff4f4; border-color: #e4b4b4; }
+.decision-message { margin-top: 6px; }
+.decision-card ul { margin: 8px 0 0; padding-left: 20px; }
 
 .composer-area { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 24px 12px; background: linear-gradient(transparent, var(--bg) 27%, var(--bg)); z-index: 12; }
 .composer { width: min(820px, 100%); margin: 0 auto; padding: 13px 13px 10px 16px; background: rgba(255,255,255,.95); border: 1px solid #dedee2; border-radius: 18px; box-shadow: var(--shadow); transition: border-color .2s, box-shadow .2s; }

@@ -2,7 +2,7 @@
 
 > 依据：仓库根目录《搜索推荐Agent技术路线.md》《搜索推荐Agent系统设计文档.md》《搜索推荐Agent需求分析文档.md》  
 > 计划周期：10～12 周（已有目录、搜索和模型基础设施时）  
-> 当前状态：阶段 0～2 已实现；阶段 3 已完成复杂度路由、Retrieval Probe、结构化计划和 Deep Path 多查询执行的首个增量
+> 当前状态：阶段 0～2 已实现；阶段 3 已完成复杂度路由、Retrieval Probe、结构化计划、一次 Replan、充分性判断、澄清和拒答
 
 ## 1. 目标和交付边界
 
@@ -195,7 +195,7 @@ POST /agent/query
 - `tests/test_runtime.py`：验证预算上限、工具重名、事件顺序、Session 写入、Receipt 和取消；
 - `tests/test_api.py`：验证健康检查、SSE 查询、Receipt 查询和非法请求 422。
 
-当前共 27 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
+当前共 35 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
 
 ### 7.9 可选 LLM 意图解析增量
 
@@ -246,6 +246,6 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 ## 8. 阶段 3：Grounded Deep Path 首个增量
 
-当前已完成复杂度路由、Retrieval Probe、结构化 Planner、有限并行查询、二层 RRF，以及路由/Probe/Plan 的 SSE 与 Receipt 记录。简单请求不执行 Probe，保持原 Fast Path 的两次工具调用。
+当前已完成复杂度路由、Retrieval Probe、结构化 Planner、有限并行查询、二层 RRF、充分性判断、最多一次 Replan、澄清/拒答，以及完整的 SSE 与 Receipt 记录。简单请求不执行 Probe，保持原 Fast Path 的两次工具调用；Fast Path 结果不足时可以在预算内升级。
 
-详细设计和新增文件职责见 [Grounded Deep Path 首个增量](../01-architecture/deep-path.md)。下一步是结果充分性判断、最多一次 Replan、澄清/拒答和明确停止条件。
+详细设计和新增文件职责见 [Grounded Deep Path 首个增量](../01-architecture/deep-path.md)。下一步是结构化 DAG 节点依赖、并发上限、节点级停止条件和故障降级。

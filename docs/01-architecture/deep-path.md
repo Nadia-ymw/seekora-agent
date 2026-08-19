@@ -11,7 +11,10 @@ resolve_intent → route
   ├─ fast → recall ───────────────────────┐
   └─ deep → probe → plan → deep_recall ──┤
                                           ↓
-                         constraints → result
+                         constraints → sufficiency
+                                          ├─ sufficient → result
+                                          ├─ replan（最多一次）→ deep_recall
+                                          └─ clarify / refuse → terminal
 ```
 
 ## 确定性边界
@@ -29,9 +32,11 @@ resolve_intent → route
 |---|---|
 | `domain/deep_path.py` | 定义路由决定、Probe 摘要和结构化计划等稳定领域契约。 |
 | `application/deep_path.py` | 实现复杂度路由、低成本 Probe 和受约束 Planner。 |
+| `application/sufficiency.py` | 根据候选、来源支持、预算和 Replan 次数决定返回、重规划、澄清或拒答。 |
 | `tests/test_deep_path.py` | 验证路由规则、Deep Path 事件/Receipt，以及 Fast Path 不承担 Probe 成本。 |
+| `tests/test_sufficiency.py` | 验证充分性、一次 Replan、澄清和拒答的确定性策略。 |
 | `docs/01-architecture/deep-path.md` | 记录本增量链路、信任边界、文件职责和后续边界。 |
 
 ## 当前边界与后续任务
 
-当前 Planner 是确定性实现，最多生成两个并行查询；尚未实现 LLM Planner、一次 Replan、跨节点依赖 DAG、澄清/拒答和外部 Web 检索。下一增量应先增加结果充分性判断与最多一次 Replan，再接入澄清和停止条件。
+当前 Planner 是确定性实现，最多生成两个并行查询；结果不足时允许一次基于现有领域和偏好的 Replan，之后必须澄清或拒答。尚未实现 LLM Planner、跨节点依赖 DAG 和外部 Web 检索。下一增量应实现结构化 DAG 节点依赖、并发上限和节点级停止条件。

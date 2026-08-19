@@ -19,6 +19,7 @@
 - [本地开发指南](02-development/getting-started.md)：环境安装、CLI、API 和常用命令。
 - [LLM 配置与新增文件说明](02-development/llm-configuration.md)：API Key、Provider 选择、降级路径和本增量文件职责。
 - [Web 测试台使用说明](02-development/frontend-testing.md)：聊天页面、SSE 事件、模型调用识别和文件职责。
+- [Deep Path 测试指南](02-development/deep-path-testing.md)：Fast/Deep 路由、SSE、Receipt 和复杂约束验收用例。
 - [编码与扩展规范](02-development/coding-standards.md)：新增模块、工具和基础设施适配器的约定。
 
 ## 03 测试

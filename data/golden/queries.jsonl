@@ -3,3 +3,13 @@
 {"query_id":"q-003","query":"高性能游戏独立显卡笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"lap-002":3}}
 {"query_id":"q-004","query":"长续航移动办公笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"battery_hours","operator":"gte","value":13}],"relevance":{"lap-001":3,"lap-003":2}}
 {"query_id":"q-005","query":"可以运行虚拟机的软件开发笔记本","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"memory_gb","operator":"gte","value":32}],"relevance":{"lap-004":3,"lap-001":1}}
+{"query_id":"q-006","query":"适合通勤和远程会议的主动降噪耳机","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"aud-001":3,"aud-004":1}}
+{"query_id":"q-007","query":"跑步健身用防水真无线耳机","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":600}],"relevance":{"aud-002":3}}
+{"query_id":"q-008","query":"专业录音混音有线监听耳机","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"aud-003":3}}
+{"query_id":"q-009","query":"适合设计摄影的27英寸4K显示器","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"mon-001":3}}
+{"query_id":"q-010","query":"2K高刷新率电竞游戏显示器","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":2200}],"relevance":{"mon-002":3}}
+{"query_id":"q-011","query":"编程剪辑多任务超宽显示器","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"mon-003":3}}
+{"query_id":"q-012","query":"适合编程的矮轴无线机械键盘","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":700}],"relevance":{"key-001":3}}
+{"query_id":"q-013","query":"减少手腕压力的人体工学分体键盘","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[],"relevance":{"key-003":3}}
+{"query_id":"q-014","query":"带可调腰托适合长时间办公的人体工学椅","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":1500}],"relevance":{"chr-001":3,"chr-002":2}}
+{"query_id":"q-015","query":"出差导航用的大电池长续航手机","tenant_id":"demo","allowed_permission_tags":["public"],"constraints":[{"field":"price","operator":"lte","value":2500}],"relevance":{"pho-002":3}}

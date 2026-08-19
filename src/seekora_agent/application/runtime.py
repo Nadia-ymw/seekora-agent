@@ -54,6 +54,7 @@ class AgentRuntime:
         })
 
         final_items: list[dict] = []
+        terminal_status = "completed"
         # 构建工作流状态
         state: FastPathState = {
             "request_id": request_id,
@@ -63,6 +64,7 @@ class AgentRuntime:
             "allowed_permission_tags": query.allowed_permission_tags,
             "top_k": query.top_k,
             "budget": budget,
+            "replan_count": 0,
         }
         try:
             await self._ensure_active(request_id)
@@ -84,9 +86,14 @@ class AgentRuntime:
                         yield AgentEvent("recall.started", request_id, {
                             "sources": list(self.workflow.recall.source_tools), "route": "fast",
                         })
-                elif node_name == "probe":
+                elif node_name in {"probe", "escalate_probe"}:
                     summary = payload["probe_summary"]
                     probe_result = payload["probe_result"]
+                    if node_name == "escalate_probe":
+                        decision = payload["route_decision"]
+                        receipt.route = decision.route
+                        receipt.route_decision = decision.as_dict()
+                        yield AgentEvent("routing.escalated", request_id, decision.as_dict())
                     receipt.probe_summary = summary.as_dict()
                     self._record_tool_calls(receipt, probe_result.calls)
                     yield AgentEvent("probe.completed", request_id, summary.as_dict())
@@ -98,6 +105,17 @@ class AgentRuntime:
                         "sources": list(self.workflow.recall.source_tools),
                         "route": "deep",
                         "queries": [step.query for step in plan.steps],
+                    })
+                elif node_name == "replan":
+                    plan = payload["plan"]
+                    receipt.plan = plan.as_dict()
+                    receipt.replan_count = payload["replan_count"]
+                    yield AgentEvent("plan.replanned", request_id, plan.as_dict())
+                    yield AgentEvent("recall.started", request_id, {
+                        "sources": list(self.workflow.recall.source_tools),
+                        "route": "deep",
+                        "queries": [step.query for step in plan.steps],
+                        "revision": plan.revision,
                     })
                 # 召回
                 elif node_name in {"recall", "deep_recall"}:
@@ -121,18 +139,39 @@ class AgentRuntime:
                         "accepted_count": min(len(filtered.accepted), query.top_k),
                         "filtered_reason_counts": filtered.filtered_reason_counts,
                     })
+                elif node_name == "assess_sufficiency":
+                    assessment = payload["sufficiency"]
+                    receipt.sufficiency_assessments.append(assessment.as_dict())
+                    yield AgentEvent("sufficiency.assessed", request_id, assessment.as_dict())
                 # 结果组装
                 elif node_name == "compose_result":
                     final_items = payload["items"]
                     receipt.candidate_ids = [str(item["item_id"]) for item in final_items]
                     yield AgentEvent("result", request_id, {"items": final_items})
+                elif node_name == "compose_terminal":
+                    final_items = payload["items"]
+                    decision = payload["terminal_decision"]
+                    receipt.candidate_ids = []
+                    receipt.terminal_decision = decision.as_dict()
+                    terminal_status = (
+                        "clarification_required" if decision.action == "clarify" else "refused"
+                    )
+                    event_name = (
+                        "clarification.required"
+                        if decision.action == "clarify"
+                        else "response.refused"
+                    )
+                    yield AgentEvent(event_name, request_id, decision.as_dict())
+                    yield AgentEvent("result", request_id, {
+                        "items": [], "decision": decision.as_dict(),
+                    })
 
             await self.sessions.append(
                 session,
                 SessionMessage("assistant", f"returned {len(final_items)} items", request_id),
             )
             # 完成收据，标记完成
-            receipt.finish("completed")
+            receipt.finish(terminal_status)
         # 异常处理
         except RequestCancelled:
             receipt.finish("cancelled", "REQUEST_CANCELLED")

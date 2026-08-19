@@ -12,7 +12,7 @@
 | `tests/test_langchain_workflow.py` | 框架测试 | LangGraph 节点和 LangChain Tool 类型 |
 | `tests/test_llm_intent.py` | Provider 边界测试 | 配置脱敏、必填项、结构化映射和规则回退；不访问网络 |
 
-当前共 27 个测试。测试必须在 `seekora-agent` Conda 环境执行。
+当前共 35 个测试。测试必须在 `seekora-agent` Conda 环境执行。
 
 ## 必须保持的不变量
 

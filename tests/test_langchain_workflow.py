@@ -11,7 +11,8 @@ class LangChainWorkflowTest(unittest.TestCase):
         nodes = set(runtime.workflow.graph.nodes)
         self.assertTrue({
             "resolve_intent", "route", "probe", "plan", "recall", "deep_recall",
-            "apply_constraints", "compose_result"
+            "escalate_probe", "replan", "apply_constraints", "assess_sufficiency",
+            "compose_result", "compose_terminal"
         }.issubset(nodes))
 
     def test_recall_sources_are_langchain_tools(self):

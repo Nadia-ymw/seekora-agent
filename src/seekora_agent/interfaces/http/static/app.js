@@ -128,7 +128,7 @@ function createAssistantMessage() {
   row.append(content);
   elements.messages.append(row);
   scrollToBottom();
-  return { row, content, summary, progress, steps, resolverTag, intent: null, results: null, receipt: null };
+  return { row, content, summary, progress, steps, resolverTag, intent: null, results: null, decision: null, receipt: null };
 }
 
 function advanceSteps(ui, current) {
@@ -167,7 +167,7 @@ function renderIntent(ui, intent) {
     : `模型已完成意图解析，正在按「${intent.retrieval_query}」检索候选。`;
 }
 
-function renderResults(ui, items) {
+function renderResults(ui, items, decision = null) {
   const section = document.createElement("div");
   section.className = "results-section";
   const head = document.createElement("div");
@@ -197,9 +197,31 @@ function renderResults(ui, items) {
   section.append(grid);
   ui.content.append(section);
   ui.results = section;
-  ui.summary.textContent = items.length
-    ? `已找到 ${items.length} 个符合目录权限和硬约束的结果。`
-    : "召回已完成，但没有候选通过最终目录与硬约束复核。";
+  ui.summary.textContent = decision
+    ? decision.message
+    : items.length
+      ? `已找到 ${items.length} 个符合目录权限和硬约束的结果。`
+      : "召回已完成，但没有候选通过最终目录与硬约束复核。";
+  scrollToBottom();
+}
+
+function renderDecision(ui, decision) {
+  if (ui.decision) ui.decision.remove();
+  const card = document.createElement("div");
+  card.className = `decision-card ${decision.action || "clarify"}`;
+  card.append(textElement(
+    "strong",
+    "",
+    decision.action === "refuse" ? "当前条件无法满足" : "需要补充信息",
+  ));
+  card.append(textElement("div", "decision-message", decision.message || "请补充关键条件。"));
+  if (decision.questions?.length) {
+    const list = document.createElement("ul");
+    decision.questions.forEach((question) => list.append(textElement("li", "", question)));
+    card.append(list);
+  }
+  ui.content.append(card);
+  ui.decision = card;
   scrollToBottom();
 }
 
@@ -240,10 +262,14 @@ function dispatchAgentEvent(ui, name, payload) {
     ui.summary.textContent = data.route === "deep"
       ? "检测到复杂或低置信请求，正在执行低成本 Retrieval Probe。"
       : "请求适合快速路径，正在准备并行召回。";
+  } else if (name === "routing.escalated") {
+    ui.summary.textContent = "Fast Path 结果不足，已升级到 Deep Path 继续检索。";
   } else if (name === "probe.completed") {
     ui.summary.textContent = `Probe 找到 ${data.candidate_count || 0} 个候选摘要，正在生成受预算约束的计划。`;
   } else if (name === "plan.created") {
     ui.summary.textContent = `Deep Path 已生成 ${(data.steps || []).length} 个可执行查询步骤。`;
+  } else if (name === "plan.replanned") {
+    ui.summary.textContent = "首轮结果不足，正在执行唯一一次受预算约束的 Replan。";
   } else if (name === "recall.started") {
     ui.summary.textContent = `正在并行调用 ${(data.sources || []).join("、")}…`;
   } else if (name === "recall.completed") {
@@ -252,9 +278,19 @@ function dispatchAgentEvent(ui, name, payload) {
   } else if (name === "constraints.applied") {
     advanceSteps(ui, "result");
     ui.summary.textContent = `${data.accepted_count || 0} 个候选通过约束，正在组织结果。`;
+  } else if (name === "sufficiency.assessed") {
+    const messages = {
+      sufficient: "候选和证据已满足回答条件。",
+      replan: "当前候选支持不足，正在判断是否可以重规划。",
+      clarify: "现有信息不足，需要向你澄清关键条件。",
+      refuse: "目录中没有满足约束且证据充分的候选。",
+    };
+    ui.summary.textContent = messages[data.action] || "正在评估结果是否充分。";
+  } else if (name === "clarification.required" || name === "response.refused") {
+    renderDecision(ui, data);
   } else if (name === "result") {
     Object.values(ui.steps).forEach((step) => { step.classList.remove("active"); step.classList.add("done"); });
-    renderResults(ui, data.items || []);
+    renderResults(ui, data.items || [], data.decision || null);
   } else if (name === "error" || name === "cancelled") {
     renderError(ui, data);
   } else if (name === "done") {

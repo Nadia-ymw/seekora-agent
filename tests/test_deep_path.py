@@ -64,6 +64,71 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("probe.completed", names)
         self.assertEqual(2, len(receipt.tool_calls))
 
+    async def test_non_laptop_category_uses_deep_path_and_returns_catalog_item(self):
+        runtime = build_runtime()
+        events = [event async for event in runtime.run(AgentQuery(
+            query="推荐1000元以内适合通勤的主动降噪耳机",
+            tenant_id="demo",
+            session_id="deep-headphones-test",
+        ))]
+        result = next(event for event in events if event.event == "result")
+        receipt = await runtime.receipts.get(events[0].request_id)
+
+        self.assertEqual("deep", receipt.route)
+        self.assertIn("aud-001", [item["item_id"] for item in result.data["items"]])
+        self.assertNotIn("aud-005", [item["item_id"] for item in result.data["items"]])
+
+    async def test_many_laptop_constraints_trigger_deep_path(self):
+        runtime = build_runtime()
+        events = [event async for event in runtime.run(AgentQuery(
+            query="推荐8000元以内内存32GB以上重量1.4kg以内的轻薄笔记本",
+            tenant_id="demo",
+            session_id="deep-constraints-test",
+        ))]
+        result = next(event for event in events if event.event == "result")
+        receipt = await runtime.receipts.get(events[0].request_id)
+
+        self.assertEqual("deep", receipt.route)
+        self.assertIn("many_hard_constraints", receipt.route_decision["reasons"])
+        self.assertEqual(["lap-001"], [item["item_id"] for item in result.data["items"]])
+
+    async def test_impossible_constraints_return_empty_grounded_result(self):
+        runtime = build_runtime()
+        events = [event async for event in runtime.run(AgentQuery(
+            query="推荐200元以内内存32GB以上重量1kg以内的轻薄笔记本",
+            tenant_id="demo",
+            session_id="deep-empty-test",
+        ))]
+        result = next(event for event in events if event.event == "result")
+        receipt = await runtime.receipts.get(events[0].request_id)
+        names = [event.event for event in events]
+
+        self.assertEqual("deep", receipt.route)
+        self.assertEqual([], result.data["items"])
+        self.assertTrue(receipt.filtered_reason_counts)
+        self.assertEqual(1, names.count("plan.replanned"))
+        self.assertIn("response.refused", names)
+        self.assertEqual(1, receipt.replan_count)
+        self.assertEqual("refused", receipt.status)
+        self.assertLessEqual(len(receipt.tool_calls), 8)
+
+    async def test_unsupported_ambiguous_query_requests_clarification(self):
+        runtime = build_runtime()
+        events = [event async for event in runtime.run(AgentQuery(
+            query="夸克熵泵",
+            tenant_id="demo",
+            session_id="deep-clarify-test",
+        ))]
+        names = [event.event for event in events]
+        result = next(event for event in events if event.event == "result")
+        receipt = await runtime.receipts.get(events[0].request_id)
+
+        self.assertIn("clarification.required", names)
+        self.assertEqual([], result.data["items"])
+        self.assertEqual("clarification_required", receipt.status)
+        self.assertEqual("clarify", receipt.terminal_decision["action"])
+        self.assertEqual(["你希望查找哪一类商品？"], receipt.terminal_decision["questions"])
+
 
 if __name__ == "__main__":
     unittest.main()

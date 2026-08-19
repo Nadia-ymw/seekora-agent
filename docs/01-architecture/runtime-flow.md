@@ -14,6 +14,7 @@ POST /agent/query
 → infrastructure/search/*：关键词和语义召回
 → recall 节点：RRF 融合
 → apply_constraints 节点：硬约束与 Catalog 最终复核
+→ assess_sufficiency 节点：判断返回、一次 Replan、澄清或拒答
 → compose_result 节点：生成结构化结果
 → application/runtime.py：消费图更新，记录 Session 和 Receipt
 → interfaces/http/api.py：输出 result 与 done 事件
@@ -26,7 +27,7 @@ request.accepted → intent.resolved → routing.completed → recall.started �
 → constraints.applied → result → done
 ```
 
-Deep Path 会在 `routing.completed` 与 `recall.started` 之间增加 `probe.completed` 和 `plan.created`。这些事件只包含结构化、可公开的执行信息，不包含私有思维链。
+Deep Path 会增加 `probe.completed`、`plan.created` 和 `sufficiency.assessed`。结果不足时最多出现一次 `plan.replanned`，随后必须返回结果、澄清或拒答。这些事件只包含结构化、可公开的执行信息，不包含私有思维链。
 
 取消路径为 `cancelled → done`，异常路径为 `error → done`。无论成功或失败，Runtime 都会在结束前写入 Receipt。
 
