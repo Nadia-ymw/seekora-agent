@@ -11,8 +11,10 @@
 | `tests/test_fast_path.py` | Fast Path 集成测试 | 意图、双路召回、RRF、约束和 Receipt |
 | `tests/test_langchain_workflow.py` | 框架测试 | LangGraph 节点和 LangChain Tool 类型 |
 | `tests/test_llm_intent.py` | Provider 边界测试 | 配置脱敏、必填项、结构化映射和规则回退；不访问网络 |
+| `tests/test_dag.py` | Deep Path DAG 测试 | 依赖校验、并发上限、节点停止和局部故障降级 |
+| `tests/test_profile.py` | 画像与授权测试 | 默认拒绝、显式授权、租户隔离、排序屏蔽和删除 |
 
-当前共 35 个测试。测试必须在 `seekora-agent` Conda 环境执行。
+当前共 47 个测试。测试必须在 `seekora-agent` Conda 环境执行。
 
 ## 必须保持的不变量
 
@@ -25,10 +27,13 @@
 - 相同输入和版本下的排序结果可重复。
 - 未配置 API Key 时默认模式可启动，测试日志与配置摘要不得包含 Key；
 - LLM Provider 失败时不得绕过规则回退和最终 Catalog 约束复核。
+- Session Intent 不得被隐式写入长期 Profile；
+- 未授权的长期偏好不得写入或进入排序链路；
+- 相同 `user_id` 在不同租户下的 Profile 必须隔离。
 
 ## 后续补充
 
-- Contract Test：Search、Catalog、Profile、Ranker 和 LLM Provider；
+- Contract Test：持久化 Profile、行为反馈、Search、Catalog、Ranker 和 LLM Provider；
 - 属性测试：约束组合、租户隔离和未知 Item；
 - Golden Set：至少 300 条真实人工查询；
 - 故障注入：单召回源、Store、LLM 和 Catalog 故障；

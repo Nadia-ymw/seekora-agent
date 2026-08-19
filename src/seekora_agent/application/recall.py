@@ -31,6 +31,14 @@ class RecallResult:
     calls: tuple[RecallCall, ...]
 
 
+class RecallUnavailable(RuntimeError):
+    """所有召回源失败时仍携带调用记录，供 DAG 降级和 Receipt 审计。"""
+
+    def __init__(self, calls: tuple[RecallCall, ...]) -> None:
+        super().__init__("ALL_RECALL_SOURCES_FAILED")
+        self.calls = calls
+
+
 class RecallOrchestrator:
     """Runs LangChain BaseTool instances and fuses their structured output."""
 
@@ -104,7 +112,7 @@ class RecallOrchestrator:
         )))
         successful = [call for call in calls if call.status == "ok"]
         if not successful:
-            raise RuntimeError("ALL_RECALL_SOURCES_FAILED")
+            raise RecallUnavailable(calls)
         # RRF融合
         fused: dict[str, dict[str, Any]] = {}
         for call in successful:
@@ -145,6 +153,10 @@ class RecallOrchestrator:
         results = await asyncio.gather(*(
             self.recall(query, top_k, context, budget) for query in unique_queries
         ))
+        return self.fuse_results(results)
+
+    def fuse_results(self, results: Sequence[RecallResult]) -> RecallResult:
+        """用第二层 RRF 融合多个 DAG 节点，避免比较不同查询的原始分数。"""
         fused: dict[str, dict[str, Any]] = {}
         for query_index, result in enumerate(results, start=1):
             for rank, candidate in enumerate(result.candidates, start=1):

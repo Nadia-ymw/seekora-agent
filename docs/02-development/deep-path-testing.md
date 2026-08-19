@@ -32,6 +32,7 @@ routing.completed
 probe.completed
 plan.created
 recall.started
+dag.completed
 recall.completed
 constraints.applied
 sufficiency.assessed
@@ -62,7 +63,7 @@ curl.exe -N -X POST http://127.0.0.1:8000/agent/query `
 curl.exe http://127.0.0.1:8000/agent/receipts/<request_id>
 ```
 
-重点检查 `route`、`route_decision`、`probe_summary`、`plan`、`tool_calls`、`candidate_ids` 和 `filtered_reason_counts`。
+重点检查 `route`、`route_decision`、`probe_summary`、`plan`、`dag_executions`、`tool_calls`、`candidate_ids` 和 `filtered_reason_counts`。
 
 ## 4. 自动化测试
 

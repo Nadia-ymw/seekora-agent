@@ -57,6 +57,46 @@ class ApiTest(unittest.TestCase):
         })
         self.assertEqual(422, response.status_code)
 
+    def test_profile_preferences_require_consent(self):
+        response = self.client.put(
+            "/agent/profiles/user-1/preferences",
+            params={"tenant_id": "demo"},
+            json={"positive_preferences": ["轻薄"], "negative_preferences": []},
+        )
+        self.assertEqual(409, response.status_code)
+
+    def test_profile_consent_preferences_and_delete_lifecycle(self):
+        consent = self.client.put(
+            "/agent/profiles/user-1/consent",
+            params={"tenant_id": "demo"},
+            json={
+                "personalization_enabled": True,
+                "behavior_storage_enabled": False,
+            },
+        )
+        self.assertEqual(200, consent.status_code)
+
+        preferences = self.client.put(
+            "/agent/profiles/user-1/preferences",
+            params={"tenant_id": "demo"},
+            json={
+                "positive_preferences": ["轻薄", "长续航"],
+                "negative_preferences": ["厚重"],
+            },
+        )
+        self.assertEqual(200, preferences.status_code)
+
+        profile = self.client.get(
+            "/agent/profiles/user-1", params={"tenant_id": "demo"}
+        ).json()
+        self.assertEqual(["轻薄", "长续航"], profile["positive_preferences"])
+        self.assertEqual(["厚重"], profile["negative_preferences"])
+
+        deleted = self.client.delete(
+            "/agent/profiles/user-1", params={"tenant_id": "demo"}
+        )
+        self.assertEqual({"deleted": True}, deleted.json())
+
 
 if __name__ == "__main__":
     unittest.main()

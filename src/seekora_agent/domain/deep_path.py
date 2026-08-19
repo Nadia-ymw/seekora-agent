@@ -47,9 +47,19 @@ class PlanStep:
     step_id: str
     query: str
     purpose: Literal["primary", "broaden"]   # 步骤目的，只能是 "primary"（主要查询）或 "broaden"（扩大范围）
+    # depends_on 声明前置节点；空元组表示该节点可以立即并行执行。
+    depends_on: tuple[str, ...] = ()
+    # required 节点失败会阻断依赖它的后续节点，但不影响其他独立分支。
+    required: bool = True
 
-    def as_dict(self) -> dict[str, str]:
-        return {"step_id": self.step_id, "query": self.query, "purpose": self.purpose}
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "step_id": self.step_id,
+            "query": self.query,
+            "purpose": self.purpose,
+            "depends_on": list(self.depends_on),
+            "required": self.required,
+        }
 
 # 完整的、有界的、可序列化的规划方案。
 # 通过 max_parallelism 和 max_replans 控制资源消耗

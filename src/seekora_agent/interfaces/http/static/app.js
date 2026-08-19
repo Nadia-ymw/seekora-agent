@@ -270,6 +270,12 @@ function dispatchAgentEvent(ui, name, payload) {
     ui.summary.textContent = `Deep Path 已生成 ${(data.steps || []).length} 个可执行查询步骤。`;
   } else if (name === "plan.replanned") {
     ui.summary.textContent = "首轮结果不足，正在执行唯一一次受预算约束的 Replan。";
+  } else if (name === "dag.completed") {
+    const completed = (data.nodes || []).filter((node) => node.status === "completed").length;
+    const failed = (data.nodes || []).filter((node) => node.status === "failed").length;
+    ui.summary.textContent = data.degraded
+      ? `DAG 已降级完成：${completed} 个节点成功，${failed} 个节点失败。`
+      : `DAG 执行完成，共 ${completed} 个节点成功。`;
   } else if (name === "recall.started") {
     ui.summary.textContent = `正在并行调用 ${(data.sources || []).join("、")}…`;
   } else if (name === "recall.completed") {

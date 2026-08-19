@@ -2,7 +2,7 @@
 
 Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而来，表达“从复杂信息中发现并照亮可信选择”。仓库和发行包统一使用 `seekora-agent`，Python 导入包使用符合标识符规范的 `seekora_agent`。
 
-这是基于 LangChain/LangGraph、按照《搜索推荐 Agent 技术路线》建设的实现项目。当前完成阶段 0～2，并进入阶段 3 Grounded Deep Path：
+这是基于 LangChain/LangGraph、按照《搜索推荐 Agent 技术路线》建设的实现项目。当前已完成阶段 3，并进入阶段 4 的用户画像与授权边界建设：
 
 - 核心 Item、Query、Constraint 和 Golden Query 数据契约；
 - 目录数据质量检查；
@@ -22,6 +22,9 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 类 GPT 的同源 Web 测试台，可实时查看模型解析器、SSE 执行进度、结果和 Receipt。
 - 复杂度路由、Retrieval Probe、结构化计划和受预算约束的 Deep Path 多查询执行。
 - 结果充分性判断、最多一次 Replan、Fast Path 零结果升级以及可审计的澄清/拒答。
+- 有界 Deep Plan DAG、节点依赖、并发限制、停止条件和独立分支故障降级。
+- Session Intent 与长期 Profile 分离，个性化和行为存储默认关闭并要求显式授权。
+- 用户画像查询、授权、显式偏好更新和删除 API，支持租户隔离。
 
 开发文档入口见 [docs/README.md](docs/README.md)，实施计划见
 [docs/00-overview/implementation-plan.md](docs/00-overview/implementation-plan.md)。

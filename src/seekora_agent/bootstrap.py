@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from .application.intent import IntentResolver
+from .application.profile import ProfileService
 from .application.runtime import AgentRuntime
 from .application.constraints import ConstraintEngine
 from .application.recall import RecallOrchestrator
@@ -18,6 +19,7 @@ from .infrastructure.search.bm25 import BM25Baseline
 from .infrastructure.search.semantic import InMemorySemanticIndex
 from .infrastructure.stores.memory import (
     InMemoryCancellationRegistry,
+    InMemoryProfileStore,
     InMemoryReceiptStore,
     InMemorySessionStore,
 )
@@ -76,6 +78,7 @@ def build_runtime(
         sessions=InMemorySessionStore(),    # 会话管理（内存）
         receipts=InMemoryReceiptStore(),    # 收据/历史记录
         cancellations=InMemoryCancellationRegistry(),   # 取消操作管理
+        profiles=ProfileService(InMemoryProfileStore()),  # 经用户授权的长期画像
     )
 
 

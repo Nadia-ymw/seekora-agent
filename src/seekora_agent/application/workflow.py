@@ -18,6 +18,7 @@ from ..domain.fast_path import ConstraintFilterResult, ResolvedIntent
 from .constraints import ConstraintEngine
 from .contracts import ExecutionBudget, RequestContext
 from .deep_path import ComplexityRouter, GroundedPlanner, RetrievalProbe
+from .dag import DagExecutionResult, DeepPlanExecutor
 from .intent import IntentResolver
 from .recall import RecallOrchestrator, RecallResult
 from .sufficiency import ResultSufficiencyEvaluator
@@ -37,6 +38,7 @@ class FastPathState(TypedDict, total=False):
     probe_result: RecallResult
     plan: DeepPlan
     recall_result: RecallResult
+    dag_execution: DagExecutionResult
     filter_result: ConstraintFilterResult
     sufficiency: SufficiencyAssessment
     replan_count: int
@@ -58,6 +60,7 @@ class LangChainFastPathWorkflow:
         probe: RetrievalProbe | None = None,
         planner: GroundedPlanner | None = None,
         sufficiency: ResultSufficiencyEvaluator | None = None,
+        dag_executor: DeepPlanExecutor | None = None,
     ) -> None:
         self.intent_resolver = intent_resolver
         self.recall = recall
@@ -66,6 +69,7 @@ class LangChainFastPathWorkflow:
         self.probe = probe or RetrievalProbe(recall)
         self.planner = planner or GroundedPlanner()
         self.sufficiency = sufficiency or ResultSufficiencyEvaluator()
+        self.dag_executor = dag_executor or DeepPlanExecutor(recall)
         builder = StateGraph(FastPathState)
         builder.add_node("resolve_intent", self._resolve_intent)
         builder.add_node("route", self._route)
@@ -163,13 +167,15 @@ class LangChainFastPathWorkflow:
         return {"recall_result": result}
 
     async def _deep_recall(self, state: FastPathState) -> dict[str, Any]:
-        result = await self.recall.recall_many(
-            [step.query for step in state["plan"].steps],
-            state["top_k"],
-            self._context(state),
-            state["budget"],
+        execution = await self.dag_executor.execute(
+            plan=state["plan"],
+            top_k=state["top_k"],
+            context=self._context(state),
+            budget=state["budget"],
+            # 原始候选达到展示量的两倍后停止可选后续节点，给约束过滤留出冗余。
+            candidate_target=max(state["top_k"] * 2, 10),
         )
-        return {"recall_result": result}
+        return {"recall_result": execution.recall_result, "dag_execution": execution}
 
     async def _apply_constraints(self, state: FastPathState) -> dict[str, Any]:
         result = await self.constraint_engine.apply(

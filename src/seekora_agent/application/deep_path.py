@@ -76,7 +76,14 @@ class GroundedPlanner:
         if broadened and broadened != intent.retrieval_query and (
             probe.candidate_count < 5 or intent.ambiguities
         ):
-            steps.append(PlanStep("query-2", broadened, "broaden"))
+            # 宽泛节点依赖主查询，并标记为可选；主查询候选充分时 DAG 会直接停止。
+            steps.append(PlanStep(
+                "query-2",
+                broadened,
+                "broaden",
+                depends_on=("query-1",),
+                required=False,
+            ))
         return DeepPlan(tuple(steps), revision=0)
 
     def can_replan(self, intent: ResolvedIntent, plan: DeepPlan | None) -> bool:

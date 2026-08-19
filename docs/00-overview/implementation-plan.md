@@ -2,7 +2,7 @@
 
 > 依据：仓库根目录《搜索推荐Agent技术路线.md》《搜索推荐Agent系统设计文档.md》《搜索推荐Agent需求分析文档.md》  
 > 计划周期：10～12 周（已有目录、搜索和模型基础设施时）  
-> 当前状态：阶段 0～2 已实现；阶段 3 已完成复杂度路由、Retrieval Probe、结构化计划、一次 Replan、充分性判断、澄清和拒答
+> 当前状态：阶段 0～3 已实现；Grounded Deep Path 已具备有界 DAG、并发限制、节点停止、一次 Replan、澄清/拒答和故障降级
 
 ## 1. 目标和交付边界
 
@@ -195,7 +195,7 @@ POST /agent/query
 - `tests/test_runtime.py`：验证预算上限、工具重名、事件顺序、Session 写入、Receipt 和取消；
 - `tests/test_api.py`：验证健康检查、SSE 查询、Receipt 查询和非法请求 422。
 
-当前共 35 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
+当前共 47 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
 
 ### 7.9 可选 LLM 意图解析增量
 
@@ -246,6 +246,19 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 ## 8. 阶段 3：Grounded Deep Path 首个增量
 
-当前已完成复杂度路由、Retrieval Probe、结构化 Planner、有限并行查询、二层 RRF、充分性判断、最多一次 Replan、澄清/拒答，以及完整的 SSE 与 Receipt 记录。简单请求不执行 Probe，保持原 Fast Path 的两次工具调用；Fast Path 结果不足时可以在预算内升级。
+当前已完成复杂度路由、Retrieval Probe、结构化 Planner、有界 DAG、节点依赖、并发限制、节点停止、局部故障降级、二层 RRF、充分性判断、最多一次 Replan、澄清/拒答，以及完整的 SSE 与 Receipt 记录。简单请求不执行 Probe，保持原 Fast Path 的两次工具调用；Fast Path 结果不足时可以在预算内升级。
 
-详细设计和新增文件职责见 [Grounded Deep Path 首个增量](../01-architecture/deep-path.md)。下一步是结构化 DAG 节点依赖、并发上限、节点级停止条件和故障降级。
+详细设计和新增文件职责见 [Grounded Deep Path 首个增量](../01-architecture/deep-path.md) 与 [Deep Path DAG 执行设计](../01-architecture/dag-execution.md)。
+
+## 9. 阶段 4：Session Intent、Profile 与 Consent 首个增量
+
+当前已完成：
+
+- 将当前任务的 `SessionIntentSnapshot` 与跨会话 `LongTermProfile` 分离；
+- 个性化和行为保存授权默认关闭，不从会话文本隐式推断长期画像；
+- 长期偏好写入前强制检查个性化授权；
+- 授权关闭后阻止排序读取，同时保留用户查询和删除数据的能力；
+- 画像按 `tenant_id + user_id` 隔离，并提供查询、授权、偏好更新和删除 API；
+- Runtime 在意图解析后只更新 Session Intent，不写入 Profile。
+
+详细设计和新增文件职责见 [Session Intent、Profile 与 Consent](../01-architecture/profile-consent.md)。下一步实现经 `behavior_storage_enabled` 授权的曝光/点击反馈事件契约、幂等写入和行为召回，暂不把未经评测的画像直接接入线上排序。

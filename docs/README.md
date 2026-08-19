@@ -12,6 +12,8 @@
 - [运行时与请求链路](01-architecture/runtime-flow.md)：HTTP、SSE、Runtime、Tool、Session 和 Receipt 的协作关系。
 - [Fast Path 设计与文件说明](01-architecture/fast-path.md)：意图解析、双路召回、RRF、约束和目录复核。
 - [Grounded Deep Path 首个增量](01-architecture/deep-path.md)：复杂度路由、Retrieval Probe、结构化计划和多查询执行。
+- [Deep Path DAG 执行设计](01-architecture/dag-execution.md)：节点依赖、并发限制、停止条件、故障降级和执行凭据。
+- [Session Intent、Profile 与 Consent](01-architecture/profile-consent.md)：短期意图、长期画像、显式授权和隐私边界。
 - [LangChain 迁移说明](01-architecture/langchain-migration.md)：StateGraph、StructuredTool、环境和扩展方式。
 
 ## 02 开发

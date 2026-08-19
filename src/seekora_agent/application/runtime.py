@@ -10,8 +10,9 @@ from collections.abc import AsyncIterator
 from uuid import uuid4
 
 from .contracts import AgentEvent, AgentQuery, BudgetExceeded, ExecutionBudget, RequestCancelled
+from .profile import ProfileService
 from .receipt import ReceiptStore, RecommendationReceipt, ToolCallReceipt
-from .session import CancellationRegistry, SessionMessage, SessionStore
+from .session import CancellationRegistry, SessionIntentSnapshot, SessionMessage, SessionStore
 from .workflow import FastPathState, LangChainFastPathWorkflow
 
 
@@ -22,11 +23,13 @@ class AgentRuntime:
         sessions: SessionStore,
         receipts: ReceiptStore,
         cancellations: CancellationRegistry,
+        profiles: ProfileService | None = None,
     ) -> None:
         self.workflow = workflow
         self.sessions = sessions
         self.receipts = receipts
         self.cancellations = cancellations
+        self.profiles = profiles
 
     async def _ensure_active(self, request_id: str) -> None:
         if await self.cancellations.is_cancelled(request_id):
@@ -76,6 +79,11 @@ class AgentRuntime:
                 if node_name == "resolve_intent":
                     intent = payload["intent"]
                     receipt.resolved_intent = intent.as_dict()
+                    # 解析结果属于本次会话任务；即使存在用户画像，也禁止在这里隐式写入。
+                    await self.sessions.set_intent(
+                        session,
+                        SessionIntentSnapshot(request_id, intent.as_dict()),
+                    )
                     yield AgentEvent("intent.resolved", request_id, intent.as_dict())
                 elif node_name == "route":
                     decision = payload["route_decision"]
@@ -121,6 +129,10 @@ class AgentRuntime:
                 elif node_name in {"recall", "deep_recall"}:
                     recall_result = payload["recall_result"]
                     self._record_tool_calls(receipt, recall_result.calls)
+                    if node_name == "deep_recall":
+                        summary = payload["dag_execution"].summary
+                        receipt.dag_executions.append(summary.as_dict())
+                        yield AgentEvent("dag.completed", request_id, summary.as_dict())
                     yield AgentEvent("recall.completed", request_id, {
                         "candidate_count": len(recall_result.candidates),
                         "sources": {

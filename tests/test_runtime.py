@@ -4,6 +4,7 @@ from seekora_agent.application.contracts import AgentQuery, BudgetExceeded, Exec
 from seekora_agent.application.constraints import ConstraintEngine
 from seekora_agent.application.recall import RecallOrchestrator
 from seekora_agent.application.runtime import AgentRuntime
+from seekora_agent.application.profile import ProfileService
 from seekora_agent.application.workflow import LangChainFastPathWorkflow
 from seekora_agent.domain.models import Item
 from seekora_agent.infrastructure.catalog_repository import InMemoryCatalogRepository
@@ -12,6 +13,7 @@ from seekora_agent.infrastructure.search.bm25 import BM25Baseline
 from seekora_agent.infrastructure.search.semantic import InMemorySemanticIndex
 from seekora_agent.infrastructure.stores.memory import (
     InMemoryCancellationRegistry,
+    InMemoryProfileStore,
     InMemoryReceiptStore,
     InMemorySessionStore,
 )
@@ -45,6 +47,7 @@ def runtime_with_one_item() -> AgentRuntime:
         sessions=InMemorySessionStore(),
         receipts=InMemoryReceiptStore(),
         cancellations=InMemoryCancellationRegistry(),
+        profiles=ProfileService(InMemoryProfileStore()),
     )
 
 
@@ -81,6 +84,8 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
         session = await runtime.sessions.get("demo", "session-1")
         self.assertEqual(2, len(session.messages))
         self.assertEqual(["user", "assistant"], [message.role for message in session.messages])
+        self.assertEqual(request_id, session.current_intent.request_id)
+        self.assertEqual("SEARCH", session.current_intent.resolved_intent["mode"])
 
     async def test_pre_cancelled_request_stops_before_tool_call(self):
         runtime = runtime_with_one_item()

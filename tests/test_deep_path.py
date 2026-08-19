@@ -41,12 +41,14 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertLess(names.index("routing.completed"), names.index("probe.completed"))
         self.assertLess(names.index("probe.completed"), names.index("plan.created"))
+        self.assertIn("dag.completed", names)
         self.assertIn("result", names)
 
         receipt = await runtime.receipts.get(events[0].request_id)
         self.assertEqual("deep", receipt.route)
         self.assertGreater(receipt.probe_summary["candidate_count"], 0)
         self.assertEqual("primary", receipt.plan["steps"][0]["purpose"])
+        self.assertEqual("completed", receipt.dag_executions[0]["stop_reason"])
         # Two source calls for the probe and two for the executable plan query.
         self.assertEqual(4, len(receipt.tool_calls))
 
