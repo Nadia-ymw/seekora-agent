@@ -10,14 +10,17 @@ class LangChainWorkflowTest(unittest.TestCase):
         runtime = build_runtime()
         nodes = set(runtime.workflow.graph.nodes)
         self.assertTrue({
-            "resolve_intent", "route", "probe", "plan", "recall", "deep_recall",
+            "resolve_intent", "merge_session_context", "route", "probe", "plan", "recall", "deep_recall",
             "escalate_probe", "replan", "apply_constraints", "assess_sufficiency",
             "compose_result", "compose_terminal"
         }.issubset(nodes))
 
     def test_recall_sources_are_langchain_tools(self):
         runtime = build_runtime()
-        self.assertEqual({"catalog_search", "vector_search"}, set(runtime.workflow.recall.tools))
+        self.assertEqual(
+            {"catalog_search", "vector_search", "behavior_recall"},
+            set(runtime.workflow.recall.tools),
+        )
         self.assertTrue(all(
             isinstance(tool, BaseTool) for tool in runtime.workflow.recall.tools.values()
         ))

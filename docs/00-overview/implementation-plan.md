@@ -98,7 +98,7 @@ POST /agent/query
 → runtime.py 创建请求、预算、Session 和 Receipt
 → workflow.py 执行 LangGraph Fast Path
 → intent resolver 生成结构化意图
-→ recall.py 并行调用 catalog_search 与 vector_search StructuredTool
+→ recall.py 并行调用 catalog_search、vector_search 与可选 behavior_recall StructuredTool
 → Constraint Engine 与 Catalog 复核
 → runtime.py 流式发送进度与结果
 → receipt.py 保存本次执行凭据
@@ -134,7 +134,7 @@ POST /agent/query
 - LangChain `StructuredTool` 提供统一异步调用与 Tool Calling 协议；
 - `RecallOrchestrator` 检查重复/缺失工具，并并行调用 `BaseTool.ainvoke()`；
 - Tool 结构化返回状态、错误码、是否可重试、数据源版本和候选；
-- BM25 与语义索引分别包装为只读 `catalog_search`、`vector_search`。
+- BM25、语义索引和授权行为分别包装为只读 `catalog_search`、`vector_search`、`behavior_recall`。
 
 后续增加 `item_detail`、`behavior_recall` 时不需要修改 Runtime，只需实现相同 Tool 接口并在召回编排器中装配。
 
@@ -156,7 +156,7 @@ POST /agent/query
 2. 创建执行预算和 Receipt；
 3. 获取 Session 并记录用户消息；
 4. 发送 `request.accepted` 并解析结构化意图；
-5. 消耗工具预算，并行调用 `catalog_search` 与 `vector_search`；
+5. 消耗工具预算，并行调用关键词、语义以及登录用户可用的行为召回；
 6. 使用 RRF 融合并检查取消状态；
 7. 执行硬约束和 Catalog 最终校验；
 8. 发送 `intent.resolved`、召回、过滤和 `result` 事件；
@@ -183,8 +183,8 @@ POST /agent/query
 
 1. 从 `SEEKORA_CATALOG_PATH` 或样例路径加载目录；
 2. 建立 BM25 基线；
-3. 创建 `catalog_search` 与 `vector_search` StructuredTool；
-4. 创建 RecallOrchestrator 并装配两个召回工具；
+3. 创建 `catalog_search`、`vector_search` 与 `behavior_recall` StructuredTool；
+4. 创建 RecallOrchestrator 并装配三个召回工具，匿名请求跳过行为工具；
 5. 装配意图解析、RRF、约束引擎和 Catalog Repository；
 6. 创建 Agent Runtime 并导出 Uvicorn 可发现的全局 `app`。
 
@@ -195,7 +195,7 @@ POST /agent/query
 - `tests/test_runtime.py`：验证预算上限、工具重名、事件顺序、Session 写入、Receipt 和取消；
 - `tests/test_api.py`：验证健康检查、SSE 查询、Receipt 查询和非法请求 422。
 
-当前共 47 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
+当前共 70 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
 
 ### 7.9 可选 LLM 意图解析增量
 
@@ -235,7 +235,7 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 ### 7.11 阶段 2 边界
 
-- 目前已有 `catalog_search` 和 `vector_search`，尚未加入行为和 Item Detail 工具；
+- 目前已有 `catalog_search`、`vector_search` 和授权行为召回，尚未加入 Item Detail 工具；
 - LLM 意图解析已提供可选 OpenAI 实现，但尚未用真实 Golden Set 完成模型质量和成本评估；
 - Session、取消和 Receipt 是单进程内存实现；
 - `client_request_id` 已进入协议但尚未实现幂等缓存；
@@ -261,4 +261,25 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 - 画像按 `tenant_id + user_id` 隔离，并提供查询、授权、偏好更新和删除 API；
 - Runtime 在意图解析后只更新 Session Intent，不写入 Profile。
 
-详细设计和新增文件职责见 [Session Intent、Profile 与 Consent](../01-architecture/profile-consent.md)。下一步实现经 `behavior_storage_enabled` 授权的曝光/点击反馈事件契约、幂等写入和行为召回，暂不把未经评测的画像直接接入线上排序。
+随后完成了行为反馈闭环的第二个增量：
+
+- 建立曝光、点击、收藏、负反馈和转化事件契约；
+- 使用租户范围内的 `event_id` 实现幂等写入和冲突检测；
+- 写入检查行为保存授权，召回同时检查行为保存和个性化授权；
+- 提供 `POST /agent/feedback`，并在删除 Profile 时传播删除行为数据；
+- 新增 `behavior_recall` LangChain Tool，执行目录状态、ACL 和查询相关性校验；
+- 行为信号只提升当前查询已经召回的商品，不独立引入历史商品。
+
+第三个增量完成服务端曝光清单与反馈归因校验：Runtime 为已授权登录用户生成曝光批次，在结果和 Receipt 中返回 `exposure_id`；反馈必须匹配租户、用户、会话、请求、商品、位置和时间，召回来源与模型版本使用服务端真值。删除 Profile 会同步删除曝光清单。
+
+第四个增量完成行为事件处理管道：使用 SQLite 先持久化再投递行为 Store；区分正常、24 小时以上迟到和超过 30 天拒绝的事件；拦截明显机器人 User-Agent；记录 `pending/processed/failed`、尝试次数和错误摘要，并支持幂等重放。删除 Profile 会同步删除队列载荷。
+
+第五个增量完成曝光—行为训练样本生成器、基础 LTR 特征契约和确定性时间切分：只使用曝光时保存的召回分数，按 7 天成熟窗口构造分级标签，复核事件身份与归因范围，并以固定时间边界切分训练、验证和测试集，避免行为结果、未成熟负样本或随机切分造成数据泄漏。
+
+为简化阶段 4 的端到端联调，默认 Bootstrap 还会初始化无密码、无 Token 的 `demo / seekora-demo-user` 测试账户，并预置明确授权的 Profile。该能力仅用于本地开发，不属于正式用户管理或认证设计。
+
+第六个增量完成多轮 Session 约束上下文：工作流读取上一轮意图，支持硬约束修改、追加、删除和清空，并通过事件与 Receipt 记录合并依据；显式新任务不会继承旧约束，临时条件也不会写入长期 Profile。
+
+随后将多轮理解简化为“结构化 AI Patch + 确定性 Reducer”：AI 只判断新任务/追问并输出 `set/add/remove/clear` 操作，Reducer 负责字段白名单、类型标准化和状态修改；模型失败或输出非法时回退到轻量规则。该方案直接调用已配置模型，不需要训练 LTR 或其他模型。
+
+详细设计和新增文件职责见 [Session Intent、Profile 与 Consent](../01-architecture/profile-consent.md)、[多轮 Session 约束上下文](../01-architecture/session-context.md)、[行为反馈与授权召回](../01-architecture/behavior-feedback.md)、[服务端曝光清单与反馈归因](../01-architecture/exposure-validation.md)、[行为事件持久化队列](../01-architecture/event-pipeline.md) 和 [曝光行为训练样本与 LTR 特征契约](../01-architecture/ltr-training.md)。由于当前不具备模型训练条件，LTR Ranker、位置偏差校正和 Teacher/Judge 暂缓；下一步优先实现不依赖训练的 Item Detail 与证据解释链路。

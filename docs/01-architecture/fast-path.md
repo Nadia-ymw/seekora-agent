@@ -2,12 +2,12 @@
 
 ## 1. 本阶段目标
 
-Fast Path 将明确、可直接执行的自然语言请求转换为结构化意图，通过关键词和语义两路召回生成候选，使用 RRF 融合，然后执行确定性硬约束与最终 Catalog 校验。
+Fast Path 将明确、可直接执行的自然语言请求转换为结构化意图，通过关键词和语义基础召回生成候选；登录且双重授权的用户可增加行为提升信号。随后使用 RRF 融合，并执行确定性硬约束与最终 Catalog 校验。
 
 ```text
 原始查询
 → 规则意图解析（默认）或 OpenAI 结构化意图解析（可选）
-→ catalog_search + vector_search 并行召回
+→ catalog_search + vector_search + 可选 behavior_recall 并行召回
 → Reciprocal Rank Fusion
 → Constraint Engine
 → Catalog 权威校验与证据
@@ -42,7 +42,7 @@ Fast Path 将明确、可直接执行的自然语言请求转换为结构化意�
 实现 `RecallOrchestrator`：
 
 1. 为每路召回消耗一次工具预算；
-2. 使用 `asyncio.gather` 并行调用 `catalog_search` 与 `vector_search`；
+2. 使用 `asyncio.gather` 并行调用基础召回，并为登录用户按 Consent 启用 `behavior_recall`；
 3. 将单源异常转换为标准错误结果，只要至少一路成功即可继续；
 4. 以 canonical `item_id` 去重；
 5. 使用 RRF 融合名次；
@@ -119,7 +119,7 @@ request.accepted
 Receipt 新增：
 
 - 完整结构化意图及解析器版本；
-- 两路召回的参数、状态、延迟和数据版本；
+- 各召回源的参数、状态、延迟和数据版本；
 - 最终候选 ID；
 - 按原因聚合的过滤数量；
 - `rrf-v1` 排序配置版本。
@@ -157,10 +157,10 @@ Receipt 新增：
 
 - 规则解析不等同于完整自然语言理解；LLM 解析也必须通过确定性约束与目录复核；
 - TF-IDF 余弦只是语义召回的内存替身；
-- 暂无 LTR、Cross-Encoder、多样性和行为召回；
+- 暂无 LTR、Cross-Encoder 和多样性排序；行为召回已有授权安全基线；
 - Evidence 当前主要来自硬约束字段，尚未生成自然语言解释；
-- 尚未实现多轮约束继承、修改和撤销；
-- 没有 Deep Path、Probe 或 Replan；
+- 多轮约束已支持结构化 AI Patch、确定性归并和规则降级；
+- Deep Path、Probe 和一次 Replan 已实现；
 - 正式性能仍需在真实 OpenSearch/Embedding/Catalog 上测试。
 
-下一增量应实现真正的向量检索适配器、约束生命周期与多轮会话，然后加入基础 Ranker 和 Top-K 语义复核。
+下一增量优先实现 Item Detail 与证据解释链路；LTR 按当前开发条件暂缓。

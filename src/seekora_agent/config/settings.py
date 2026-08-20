@@ -28,6 +28,9 @@ class AppSettings(BaseSettings):
         default=30.0, gt=0, le=300, alias="OPENAI_TIMEOUT_SECONDS"
     )
     openai_max_retries: int = Field(default=2, ge=0, le=5, alias="OPENAI_MAX_RETRIES")
+    behavior_queue_path: str | None = Field(
+        default=None, alias="SEEKORA_BEHAVIOR_QUEUE_PATH"
+    )
 
     def require_openai(self) -> tuple[str, str]:
         if self.openai_api_key is None or not self.openai_api_key.get_secret_value().strip():
@@ -52,4 +55,5 @@ class AppSettings(BaseSettings):
             "openai_timeout_seconds": self.openai_timeout_seconds,
             "openai_max_retries": self.openai_max_retries,
             "openai_api_key_configured": key_configured,
+            "behavior_queue_path": self.behavior_queue_path,
         }

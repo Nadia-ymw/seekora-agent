@@ -43,6 +43,19 @@ seekora-agent evaluate --catalog data/sample/items.jsonl --golden data/golden/qu
 python -m seekora_agent.interfaces.cli quality --catalog data/sample/items.jsonl
 ```
 
+处理本地下载的 KuaiSearch-Lite 电子产品数据：
+
+```powershell
+python -m seekora_agent.interfaces.cli prepare-kuaisearch `
+  --source data/external/kuaisearch/items_lite/train.jsonl `
+  --output data/processed/kuaisearch-electronics/items.jsonl `
+  --report data/processed/kuaisearch-electronics/report.json `
+  --category-level1-id 30 `
+  --limit 50000
+```
+
+原始数据、处理结果和完整字段映射见 [KuaiSearch-Lite 电子产品数据处理](kuaisearch-data.md)。
+
 ## 启动 API
 
 ```powershell
@@ -55,8 +68,22 @@ conda run -n seekora-agent python -m uvicorn seekora_agent.bootstrap:app --host 
 $env:SEEKORA_CATALOG_PATH = "C:\data\items.jsonl"
 ```
 
+行为事件队列默认保存在 `.runtime/behavior-events.sqlite3`。如需把运行数据放到独立目录：
+
+```powershell
+$env:SEEKORA_BEHAVIOR_QUEUE_PATH = "D:\seekora-data\behavior-events.sqlite3"
+```
+
 接口文档地址为 `http://127.0.0.1:8000/docs`。
 Web 测试台地址为 `http://127.0.0.1:8000/`。
+
+读取预置的本地测试账户：
+
+```powershell
+curl.exe http://127.0.0.1:8000/agent/dev/account
+```
+
+该账户没有密码或登录能力，详细字段和安全边界见[本地测试账户](demo-account.md)。
 
 ## 可选 LLM 意图解析
 

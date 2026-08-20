@@ -2,15 +2,18 @@
 
 ## 1. 本增量实现了什么
 
-本增量在现有 LangGraph Fast Path 中加入可选的 OpenAI 意图解析器。它只负责把自然语言转换为 `ResolvedIntent`，召回、硬约束校验、排序和目录复核仍由确定性代码执行。
+OpenAI 模式同时用于首轮 `ResolvedIntent` 解析和多轮 `ConstraintPatch` 解析。模型只负责理解自然语言，Session 归并、召回、硬约束校验、排序和目录复核仍由确定性代码执行。
 
 ```text
 SEEKORA_INTENT_RESOLVER=rules
-└─ RuleBasedIntentResolver（默认，不需要 API Key）
+├─ RuleBasedIntentResolver（默认，不需要 API Key）
+└─ RuleBasedSessionContextPatchResolver
 
 SEEKORA_INTENT_RESOLVER=openai
-└─ ChatOpenAI → 结构化 LLMIntentOutput → ResolvedIntent
-   └─ 调用或结构校验失败 → RuleBasedIntentResolver
+├─ ChatOpenAI → 结构化 LLMIntentOutput → ResolvedIntent
+│  └─ 调用或结构校验失败 → RuleBasedIntentResolver
+└─ ChatOpenAI → 结构化 ConstraintPatch → 确定性 Reducer
+   └─ 调用、结构或安全校验失败 → RuleBasedSessionContextPatchResolver
 ```
 
 系统不会自动选择或猜测模型名。启用 OpenAI 时，必须同时明确配置 `OPENAI_API_KEY` 和 `OPENAI_MODEL`。
@@ -45,13 +48,17 @@ LLM 意图解析适配器：
 - 数值单位和字段类型在进入领域层前再次标准化；
 - Provider 超时、输出不合法或转换失败时回退到规则解析器。
 
+### `infrastructure/session_context/langchain_llm.py`
+
+多轮请求的结构化 Patch 解析器。它只能输出 `new_task/follow_up` 和 `set/add/remove/clear`，不能直接写 Session，也不能输出租户或权限字段。详细边界见[多轮 Session 约束上下文](../01-architecture/session-context.md)。
+
 ### `tests/test_llm_intent.py`
 
 在不访问网络的情况下验证配置安全、缺失配置报错、结构化结果映射和失败回退。测试用 `RunnableLambda` 模拟模型响应，因此不会消耗真实 Token 或 API 额度。
 
 ### `bootstrap.py` 的装配变化
 
-`build_intent_resolver()` 是解析器选择的唯一入口。`build_runtime()` 从项目根目录读取 `.env`，根据 `SEEKORA_INTENT_RESOLVER` 注入规则或 OpenAI 实现；应用层和领域层无需感知具体供应商。
+`build_intent_resolver()` 和 `build_session_context_resolver()` 是两个装配入口。`build_runtime()` 根据同一个 `SEEKORA_INTENT_RESOLVER` 开关注入规则或 OpenAI 实现；应用层和领域层无需感知具体供应商。
 
 ## 3. 在 `seekora-agent` 环境中配置
 
@@ -104,7 +111,8 @@ SEEKORA_INTENT_RESOLVER=rules
 
 ## 5. 当前边界
 
-- LLM 当前只用于意图和约束结构化，不负责最终结果真实性；
+- LLM 当前只用于意图和多轮 Patch 结构化，不负责最终状态执行或结果真实性；
+- OpenAI 模式的第二轮及后续请求通常包含意图和 Patch 两次模型调用；
 - 回退规则保证可用性，但复杂表达在降级后可能降低解析质量；
 - 尚未实现 Provider 调用指标、Prompt 版本持久化和熔断器；
 - 真正的模型质量和延迟必须使用脱敏 Golden Set、受控测试 Key 和独立测试环境评估。

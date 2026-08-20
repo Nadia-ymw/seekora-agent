@@ -9,11 +9,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from uuid import uuid4
 
+from .behavior import BehaviorService
 from .contracts import AgentEvent, AgentQuery, BudgetExceeded, ExecutionBudget, RequestCancelled
+from .exposure import ExposureService
 from .profile import ProfileService
 from .receipt import ReceiptStore, RecommendationReceipt, ToolCallReceipt
 from .session import CancellationRegistry, SessionIntentSnapshot, SessionMessage, SessionStore
 from .workflow import FastPathState, LangChainFastPathWorkflow
+from ..domain.test_account import TestUserAccount
 
 
 class AgentRuntime:
@@ -24,12 +27,18 @@ class AgentRuntime:
         receipts: ReceiptStore,
         cancellations: CancellationRegistry,
         profiles: ProfileService | None = None,
+        behaviors: BehaviorService | None = None,
+        exposures: ExposureService | None = None,
+        test_account: TestUserAccount | None = None,
     ) -> None:
         self.workflow = workflow
         self.sessions = sessions
         self.receipts = receipts
         self.cancellations = cancellations
         self.profiles = profiles
+        self.behaviors = behaviors
+        self.exposures = exposures
+        self.test_account = test_account
 
     async def _ensure_active(self, request_id: str) -> None:
         if await self.cancellations.is_cancelled(request_id):
@@ -68,6 +77,15 @@ class AgentRuntime:
             "top_k": query.top_k,
             "budget": budget,
             "replan_count": 0,
+            # 在覆盖 Session 快照前将上一轮状态交给工作流，供显式多轮操作使用。
+            "previous_intent": (
+                session.current_intent.resolved_intent
+                if session.current_intent is not None else None
+            ),
+            "previous_intent_request_id": (
+                session.current_intent.request_id
+                if session.current_intent is not None else None
+            ),
         }
         try:
             await self._ensure_active(request_id)
@@ -77,13 +95,20 @@ class AgentRuntime:
                 node_name, payload = next(iter(update.items()))
                 # 意图解析
                 if node_name == "resolve_intent":
+                    # 原始解析结果还未合并会话条件，不对外发布或覆盖 Session。
+                    continue
+                elif node_name == "merge_session_context":
                     intent = payload["intent"]
+                    context = payload["session_context"]
                     receipt.resolved_intent = intent.as_dict()
+                    receipt.session_context = context
                     # 解析结果属于本次会话任务；即使存在用户画像，也禁止在这里隐式写入。
                     await self.sessions.set_intent(
                         session,
                         SessionIntentSnapshot(request_id, intent.as_dict()),
                     )
+                    if context["applied"]:
+                        yield AgentEvent("session.context_applied", request_id, context)
                     yield AgentEvent("intent.resolved", request_id, intent.as_dict())
                 elif node_name == "route":
                     decision = payload["route_decision"]
@@ -157,7 +182,27 @@ class AgentRuntime:
                     yield AgentEvent("sufficiency.assessed", request_id, assessment.as_dict())
                 # 结果组装
                 elif node_name == "compose_result":
-                    final_items = payload["items"]
+                    final_items = [dict(item) for item in payload["items"]]
+                    if self.exposures is not None:
+                        exposure = await self.exposures.register(
+                            tenant_id=query.tenant_id,
+                            user_id=query.user_id,
+                            session_id=query.session_id,
+                            request_id=request_id,
+                            items=final_items,
+                            model_version=receipt.config_versions["agent"],
+                        )
+                        if exposure is not None:
+                            receipt.exposure_id = exposure.exposure_id
+                            # 把服务端曝光 ID 和位置返回给客户端，后续反馈必须原样携带。
+                            final_items = [
+                                {
+                                    **item,
+                                    "exposure_id": exposure.exposure_id,
+                                    "position": position,
+                                }
+                                for position, item in enumerate(final_items)
+                            ]
                     receipt.candidate_ids = [str(item["item_id"]) for item in final_items]
                     yield AgentEvent("result", request_id, {"items": final_items})
                 elif node_name == "compose_terminal":

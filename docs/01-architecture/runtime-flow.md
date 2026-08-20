@@ -8,8 +8,9 @@ POST /agent/query
 → application/runtime.py：建立 request_id、预算、Session、Receipt
 → application/workflow.py：启动编译后的 LangGraph
 → resolve_intent 节点：结构化意图与硬约束
+→ merge_session_context 节点：AI 生成 ConstraintPatch，确定性 Reducer 校验并合并
 → route 节点：根据可审计复杂度信号选择 Fast/Deep Path
-→ Fast：recall 节点并行调用 catalog_search 与 vector_search Tool
+→ Fast：recall 节点并行调用关键词、语义与可选的授权行为 Tool
 → Deep：probe → plan → deep_recall，以有界 DAG 执行依赖节点和有限多查询
 → infrastructure/search/*：关键词和语义召回
 → recall 节点：RRF 融合
@@ -26,6 +27,8 @@ POST /agent/query
 request.accepted → intent.resolved → routing.completed → recall.started → recall.completed
 → constraints.applied → result → done
 ```
+
+发生多轮合并时，`intent.resolved` 前会增加 `session.context_applied`，其中只记录结构化 Patch 和合并摘要，不包含模型思维链。
 
 Deep Path 会增加 `probe.completed`、`plan.created`、`dag.completed` 和 `sufficiency.assessed`。结果不足时最多出现一次 `plan.replanned`，随后必须返回结果、澄清或拒答。`dag.completed` 包含节点状态、停止原因和降级标记。这些事件只包含结构化、可公开的执行信息，不包含私有思维链。
 

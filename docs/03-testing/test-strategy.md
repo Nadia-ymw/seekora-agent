@@ -13,8 +13,16 @@
 | `tests/test_llm_intent.py` | Provider 边界测试 | 配置脱敏、必填项、结构化映射和规则回退；不访问网络 |
 | `tests/test_dag.py` | Deep Path DAG 测试 | 依赖校验、并发上限、节点停止和局部故障降级 |
 | `tests/test_profile.py` | 画像与授权测试 | 默认拒绝、显式授权、租户隔离、排序屏蔽和删除 |
+| `tests/test_behavior.py` | 行为闭环测试 | 写入授权、幂等冲突、双重 Consent、ACL、相关性和删除传播 |
+| `tests/test_exposure.py` | 曝光归因测试 | 授权登记、服务端归因、关联校验、时钟偏差和删除隔离 |
+| `tests/test_event_pipeline.py` | 事件管道测试 | 持久化、迟到策略、机器人过滤、冲突、失败重放和 SQLite 恢复 |
+| `tests/test_demo_account.py` | 测试账户测试 | 初始 Profile、授权状态、普通用户隐私默认值和无认证秘密 |
+| `tests/test_training.py` | LTR 数据测试 | 分级标签、成熟窗口、归因复核、曝光时特征和时间切分 |
+| `tests/test_session_context.py` | 多轮约束测试 | 条件替换、删除、清空和新任务隔离 |
+| `tests/test_llm_session_context.py` | 多轮 AI 边界测试 | 结构化 Patch、规则降级和非法安全字段拦截 |
+| `tests/test_kuaisearch.py` | 外部目录转换测试 | 类目过滤、Schema 映射、合成测试属性、确定性采样和路径保护 |
 
-当前共 47 个测试。测试必须在 `seekora-agent` Conda 环境执行。
+当前共 91 个测试。测试必须在安装项目依赖的 Python 环境执行。
 
 ## 必须保持的不变量
 
@@ -28,8 +36,18 @@
 - 未配置 API Key 时默认模式可启动，测试日志与配置摘要不得包含 Key；
 - LLM Provider 失败时不得绕过规则回退和最终 Catalog 约束复核。
 - Session Intent 不得被隐式写入长期 Profile；
+- AI 只能提交白名单 ConstraintPatch，最终 Session 必须由确定性 Reducer 修改；
 - 未授权的长期偏好不得写入或进入排序链路；
 - 相同 `user_id` 在不同租户下的 Profile 必须隔离。
+- 相同事件重复写入必须幂等，不同载荷不得复用同一事件 ID；
+- 行为召回必须经过双重授权，且不能独立引入当前查询未召回的商品；
+- 删除 Profile 必须同步传播到同租户用户的行为数据。
+- 反馈身份、请求、商品和位置必须与服务端曝光清单一致；
+- 客户端提交的召回来源和模型版本不得覆盖服务端归因真值。
+- 事件必须先入持久化队列再投递 Sink，失败状态必须可重放；
+- 超龄或明显机器人事件不得进入行为数据，迟到事件必须被显式标记。
+- 未走完归因窗口的曝光不得生成负样本，模型特征不得读取曝光后的行为结果；
+- 训练、验证和测试集必须按曝光时间切分，同一曝光不得跨集合。
 
 ## 后续补充
 

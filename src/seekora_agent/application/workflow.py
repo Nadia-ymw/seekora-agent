@@ -21,6 +21,7 @@ from .deep_path import ComplexityRouter, GroundedPlanner, RetrievalProbe
 from .dag import DagExecutionResult, DeepPlanExecutor
 from .intent import IntentResolver
 from .recall import RecallOrchestrator, RecallResult
+from .session_context import SessionContextResolver
 from .sufficiency import ResultSufficiencyEvaluator
 
 
@@ -33,6 +34,9 @@ class FastPathState(TypedDict, total=False):
     top_k: int
     budget: ExecutionBudget
     intent: ResolvedIntent
+    previous_intent: dict[str, Any] | None
+    previous_intent_request_id: str | None
+    session_context: dict[str, Any]
     route_decision: RouteDecision
     probe_summary: ProbeSummary
     probe_result: RecallResult
@@ -61,6 +65,7 @@ class LangChainFastPathWorkflow:
         planner: GroundedPlanner | None = None,
         sufficiency: ResultSufficiencyEvaluator | None = None,
         dag_executor: DeepPlanExecutor | None = None,
+        session_context: SessionContextResolver | None = None,
     ) -> None:
         self.intent_resolver = intent_resolver
         self.recall = recall
@@ -70,8 +75,10 @@ class LangChainFastPathWorkflow:
         self.planner = planner or GroundedPlanner()
         self.sufficiency = sufficiency or ResultSufficiencyEvaluator()
         self.dag_executor = dag_executor or DeepPlanExecutor(recall)
+        self.session_context = session_context or SessionContextResolver()
         builder = StateGraph(FastPathState)
         builder.add_node("resolve_intent", self._resolve_intent)
+        builder.add_node("merge_session_context", self._merge_session_context)
         builder.add_node("route", self._route)
         builder.add_node("probe", self._probe)
         builder.add_node("escalate_probe", self._escalate_probe)
@@ -84,7 +91,8 @@ class LangChainFastPathWorkflow:
         builder.add_node("compose_result", self._compose_result)
         builder.add_node("compose_terminal", self._compose_terminal)
         builder.add_edge(START, "resolve_intent")
-        builder.add_edge("resolve_intent", "route")
+        builder.add_edge("resolve_intent", "merge_session_context")
+        builder.add_edge("merge_session_context", "route")
         builder.add_conditional_edges(
             "route",
             lambda state: state["route_decision"].route,
@@ -123,6 +131,15 @@ class LangChainFastPathWorkflow:
 
     async def _resolve_intent(self, state: FastPathState) -> dict[str, Any]:
         return {"intent": await self.intent_resolver.resolve(state["query"])}
+
+    async def _merge_session_context(self, state: FastPathState) -> dict[str, Any]:
+        result = await self.session_context.merge(
+            query=state["query"],
+            current=state["intent"],
+            previous_intent=state.get("previous_intent"),
+            previous_request_id=state.get("previous_intent_request_id"),
+        )
+        return {"intent": result.intent, "session_context": result.as_dict()}
 
     async def _route(self, state: FastPathState) -> dict[str, Any]:
         return {"route_decision": self.router.decide(state["intent"])}

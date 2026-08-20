@@ -48,8 +48,8 @@ class RequestContext:
 
 @dataclass
 class ExecutionBudget:
-    # Deep Path uses one two-source probe plus at most two two-source plan queries.
-    max_tool_calls: int = 8
+    # Deep Path 最多执行一次三源 Probe 和两次三源计划查询，并保留少量降级余量。
+    max_tool_calls: int = 12
     deadline_ms: int = 8_000
     started_at: float = field(default_factory=monotonic)
     tool_calls: int = 0

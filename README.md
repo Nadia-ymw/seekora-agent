@@ -24,7 +24,14 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 结果充分性判断、最多一次 Replan、Fast Path 零结果升级以及可审计的澄清/拒答。
 - 有界 Deep Plan DAG、节点依赖、并发限制、停止条件和独立分支故障降级。
 - Session Intent 与长期 Profile 分离，个性化和行为存储默认关闭并要求显式授权。
+- 多轮会话由结构化 AI 生成 ConstraintPatch、确定性 Reducer 执行，支持修改、追加、删除和清空，并保留规则降级。
 - 用户画像查询、授权、显式偏好更新和删除 API，支持租户隔离。
+- 曝光/点击等行为事件的授权写入、幂等去重、删除传播和 ACL 安全行为召回。
+- 服务端曝光清单、反馈身份/商品/位置校验，以及可信召回来源和模型版本归因。
+- SQLite 持久化反馈队列、24 小时迟到水位线、异常时间拒绝、机器人过滤和幂等重放。
+- 曝光—行为 LTR 训练样本、7 天成熟窗口、版本化基础特征和防泄漏时间切分。
+- KuaiSearch-Lite 电子数码商品的流式转换、确定性开发采样、合成测试规格和数据质量报告。
+- 预置 `demo / seekora-demo-user` 本地测试账户，可直接覆盖曝光、反馈和行为召回链路。
 
 开发文档入口见 [docs/README.md](docs/README.md)，实施计划见
 [docs/00-overview/implementation-plan.md](docs/00-overview/implementation-plan.md)。

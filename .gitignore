@@ -5,3 +5,7 @@ __pycache__/
 .env
 *.egg-info/
 reports/*.tmp
+.runtime/
+# 外部原始数据和由脚本生成的大型数据集不进入 Git。
+/data/external/
+/data/processed/

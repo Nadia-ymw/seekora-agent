@@ -10,7 +10,7 @@
 
 意图解析完成后，Runtime 只更新 Session Intent，不会向 Profile 写入任何推断结果。长期偏好写入前必须启用 `personalization_enabled`；关闭该授权后，数据仍可由用户查询或删除，但 `ranking_snapshot()` 不会把它提供给排序链路。
 
-`behavior_storage_enabled` 已作为独立授权建模，本增量尚未采集点击、曝光或转化行为。后续反馈闭环必须先检查该开关。
+`behavior_storage_enabled` 作为独立授权控制曝光、点击等事件的写入；行为是否能参与召回还必须再次检查 `personalization_enabled`。详细链路见 [行为反馈与授权召回](behavior-feedback.md)。
 
 ## 本地 API
 

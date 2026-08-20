@@ -12,10 +12,10 @@ class RuleBasedIntentResolver:
     version = "rules-zh-v1"
 
     _constraint_patterns = (
-        (re.compile(r"(?:预算|价格)?\s*(\d+(?:\.\d+)?)\s*元?\s*(?:以内|以下|不超过)"), "price", "lte", float),
-        (re.compile(r"(?:内存)?\s*(\d+)\s*(?:gb|g)\s*(?:内存)?\s*(?:以上|起)", re.I), "memory_gb", "gte", int),
-        (re.compile(r"(?:续航)?\s*(\d+(?:\.\d+)?)\s*(?:小时|h)\s*(?:以上|起)", re.I), "battery_hours", "gte", float),
-        (re.compile(r"(?:重量)?\s*(\d+(?:\.\d+)?)\s*(?:kg|公斤)\s*(?:以内|以下|不超过)", re.I), "weight_kg", "lte", float),
+        (re.compile(r"(?:预算|价格)?\s*(?:改成|调整为|修改为|变为|到)?\s*(\d+(?:\.\d+)?)\s*元?\s*(?:以内|以下|不超过)"), "price", "lte", float),
+        (re.compile(r"(?:内存)?\s*(?:改成|调整为|修改为|变为|到)?\s*(\d+)\s*(?:gb|g)\s*(?:内存)?\s*(?:以上|起)", re.I), "memory_gb", "gte", int),
+        (re.compile(r"(?:续航)?\s*(?:改成|调整为|修改为|变为|到)?\s*(\d+(?:\.\d+)?)\s*(?:小时|h)\s*(?:以上|起)", re.I), "battery_hours", "gte", float),
+        (re.compile(r"(?:重量)?\s*(?:改成|调整为|修改为|变为|到)?\s*(\d+(?:\.\d+)?)\s*(?:kg|公斤)\s*(?:以内|以下|不超过)", re.I), "weight_kg", "lte", float),
     )
 
     async def resolve(self, query: str) -> ResolvedIntent:

@@ -75,7 +75,12 @@ class ConstraintEngine:
                     "value": item.field_value(rule.field),
                     "source_uri": f"catalog://item/{item.item_id}",
                     "observed_at": item.updated_at.isoformat(),
-                    "trust_level": "authoritative",
+                    # 测试合成字段不能伪装成目录权威事实。
+                    "trust_level": (
+                        "synthetic"
+                        if item.attributes.get("synthetic_test_data")
+                        else "authoritative"
+                    ),
                 }
                 for rule in intent.hard_constraints
             )

@@ -33,7 +33,9 @@ class RecommendationReceipt:
     finished_at: str | None = None
     tool_calls: list[ToolCallReceipt] = field(default_factory=list)
     candidate_ids: list[str] = field(default_factory=list)
+    exposure_id: str | None = None
     resolved_intent: dict[str, Any] = field(default_factory=dict)
+    session_context: dict[str, Any] = field(default_factory=dict)
     route_decision: dict[str, Any] = field(default_factory=dict)
     probe_summary: dict[str, Any] = field(default_factory=dict)
     plan: dict[str, Any] = field(default_factory=dict)
@@ -44,8 +46,8 @@ class RecommendationReceipt:
     filtered_reason_counts: dict[str, int] = field(default_factory=dict)
     error_code: str | None = None
     config_versions: dict[str, str] = field(default_factory=lambda: {
-        "agent": "0.10.0",
-        "workflow": "langgraph-dual-path-v3",
+        "agent": "0.16.0",
+        "workflow": "langgraph-dual-path-v5",
         "prompt": "none",
         "tool_policy": "v1",
         "ranker": "rrf-v1",

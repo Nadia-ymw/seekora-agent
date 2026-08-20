@@ -103,12 +103,18 @@ class RecallOrchestrator:
             "user_id": context.user_id,
             "allowed_permission_tags": list(context.allowed_permission_tags),
         }
+        # 未登录请求没有稳定 user_id，不调用行为召回，避免无意义的工具成本。
+        active_sources = tuple(
+            source
+            for source in self.source_tools
+            if source != "behavior_recall" or context.user_id is not None
+        )
         # 在执行前就扣除调用时间预算，防止超预算执行
-        for _ in self.source_tools:
+        for _ in active_sources:
             budget.consume_tool_call()
         # 并行调用
         calls = tuple(await asyncio.gather(*(
-            self._invoke(tool_name, dict(arguments)) for tool_name in self.source_tools
+            self._invoke(tool_name, dict(arguments)) for tool_name in active_sources
         )))
         successful = [call for call in calls if call.status == "ok"]
         if not successful:
@@ -137,6 +143,8 @@ class RecallOrchestrator:
                 reasons=tuple(value["reasons"]),
             )
             for item_id, value in fused.items()
+            # 行为信号只能提升当前查询已召回的商品，不能单独引入无关历史商品。
+            if set(value["source_scores"]) != {"behavior_recall"}
         ]
         ranked.sort(key=lambda item: (-item.score, item.item_id))
         return RecallResult(tuple(ranked), calls)

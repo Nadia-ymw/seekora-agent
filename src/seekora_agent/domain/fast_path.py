@@ -23,6 +23,25 @@ class ResolvedIntent:
     ambiguities: tuple[str, ...] = ()
     resolver_version: str = "unknown"
 
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> "ResolvedIntent":
+        """从 Session 快照恢复领域对象，供多轮上下文合并使用。"""
+        return cls(
+            mode=raw["mode"],
+            domain=raw.get("domain"),
+            retrieval_query=str(raw["retrieval_query"]),
+            hard_constraints=tuple(
+                Constraint.from_dict(item) for item in raw.get("hard_constraints", [])
+            ),
+            soft_preferences=tuple(str(item) for item in raw.get("soft_preferences", [])),
+            negative_preferences=tuple(
+                str(item) for item in raw.get("negative_preferences", [])
+            ),
+            confidence=float(raw.get("confidence", 0.0)),
+            ambiguities=tuple(str(item) for item in raw.get("ambiguities", [])),
+            resolver_version=str(raw.get("resolver_version", "unknown")),
+        )
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "mode": self.mode,
