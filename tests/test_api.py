@@ -195,7 +195,7 @@ class ApiTest(unittest.TestCase):
         self.assertNotEqual(
             ["untrusted_source"], created.json()["event"]["recall_sources"]
         )
-        self.assertEqual("0.16.0", created.json()["event"]["model_version"])
+        self.assertEqual("0.17.0", created.json()["event"]["model_version"])
         self.assertEqual(200, duplicate.status_code)
         self.assertTrue(duplicate.json()["duplicate"])
 

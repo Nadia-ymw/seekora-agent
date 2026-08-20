@@ -25,6 +25,16 @@ class LangChainWorkflowTest(unittest.TestCase):
             isinstance(tool, BaseTool) for tool in runtime.workflow.recall.tools.values()
         ))
 
+    def test_trusted_context_is_hidden_from_model_tool_schema(self):
+        runtime = build_runtime()
+        for registered_tool in runtime.workflow.recall.tools.values():
+            properties = registered_tool.tool_call_schema.model_json_schema()["properties"]
+            self.assertEqual({"query", "top_k"}, set(properties))
+            self.assertNotIn("runtime", properties)
+            self.assertNotIn("tenant_id", properties)
+            self.assertNotIn("user_id", properties)
+            self.assertNotIn("allowed_permission_tags", properties)
+
 
 if __name__ == "__main__":
     unittest.main()

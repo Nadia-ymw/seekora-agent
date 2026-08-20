@@ -4,13 +4,14 @@
 
 项目从自研 Tool Registry 和手写阶段调用迁移到：
 
-- LangChain `BaseTool` / `StructuredTool`：统一工具 Schema、异步调用和未来模型 Tool Calling；
+- LangChain `@tool`：从函数签名、中文 docstring 和 Field 约束生成工具 Schema；
+- LangGraph `ToolNode` / LangChain `ToolRuntime`：执行工具并注入租户、用户和 ACL；
 - LangGraph `StateGraph`：显式描述 Fast Path 节点、边和共享状态；
 - LangGraph `astream(..., stream_mode="updates")`：将节点更新转换为现有 SSE 事件；
 - LangChain `ChatOpenAI.with_structured_output()`：可选地生成经过 Schema 校验的意图；
 - Conda `seekora-agent`：唯一开发和测试环境。
 
-Fast Path 是确定性高置信链路，因此没有使用开放式 `create_agent` 循环。LangChain 官方 Agent 本身构建于 LangGraph；后续 Deep Path 需要模型自主选工具时，可将 `create_agent` 作为一个子图节点接入当前 StateGraph。
+Fast Path 是确定性高置信链路，因此没有使用开放式 `create_agent` 循环。工具仍按标准 LangChain 方式注册到 `ToolNode`；由业务路由选择召回集合，避免模型绕过预算、授权或目录复核。
 
 ## 2. 图结构
 
@@ -37,19 +38,23 @@ START
 
 ### `application/recall.py`
 
-移除自研 Tool Registry，直接接收 LangChain `BaseTool`。通过 `tool.ainvoke()` 并行调用召回源，对结构化 Tool 输出做 RRF。重复工具名、缺少必需工具和工具异常均在这里收口。
+根据登录状态动态缩小召回工具集合，并行请求已注册工具，对结构化 Artifact 做 RRF。它不再把租户、用户和 ACL 放进工具参数。
+
+### `application/tool_registry.py`
+
+接收标准 LangChain `BaseTool` 列表，检查重名后统一注册到 `ToolNode`。调用时构造标准 Tool Call，由 ToolNode 自动注入 `ToolRuntime[RequestContext]`；执行结果通过 `ToolMessage.artifact` 返回应用层。
 
 ### `infrastructure/tools/catalog_search.py`
 
-使用 Pydantic `CatalogSearchInput` 定义参数 Schema，通过 `StructuredTool.from_function(coroutine=...)` 创建 `catalog_search`。返回结构化字典，而不是供模型阅读的自由文本。
+使用 `@tool` 创建 `catalog_search`。模型可见 Schema 只有 `query` 和 `top_k`；中文 docstring 与 Field 描述帮助模型理解调用条件，工具同时返回可读摘要和结构化 Artifact。
 
 ### `infrastructure/tools/vector_search.py`
 
-使用同样方式创建 `vector_search`。两类 Tool 都显式接收租户和 ACL，调用底层搜索前执行权限过滤。
+使用同样方式创建 `vector_search`。目录工具从 `ToolRuntime.context` 读取租户和 ACL，模型无法生成或覆盖这些可信字段。
 
 ### `bootstrap.py`
 
-创建两个 StructuredTool、RecallOrchestrator、Constraint Engine 和 LangChainFastPathWorkflow，然后把编译图注入 Runtime。所有具体实现仍集中在启动装配层。
+创建三个 `@tool` 工具列表、RecallOrchestrator、Constraint Engine 和 LangChainFastPathWorkflow，然后把编译图注入 Runtime。所有具体实现仍集中在启动装配层。
 
 0.5.0 起，启动层还根据 `SEEKORA_INTENT_RESOLVER` 选择规则解析器或 OpenAI 结构化解析器。OpenAI 解析异常时回退规则实现，其他图节点不需要感知 Provider。
 
@@ -59,7 +64,7 @@ START
 
 ### `tests/test_langchain_workflow.py`
 
-验证工作流确实是编译后的 LangGraph，且召回源确实是 LangChain `BaseTool`，防止后续重构意外退回自研 Registry。
+验证工作流和召回源类型，并检查模型工具 Schema 只包含 `query/top_k`，防止可信身份字段再次暴露给模型。
 
 ## 4. 环境操作
 
@@ -86,7 +91,7 @@ conda run -n seekora-agent python -m uvicorn seekora_agent.bootstrap:app --port 
 
 ## 5. 版本和边界
 
-当前验证版本为 LangChain 1.3.x、LangChain Core 1.5.x、LangGraph 1.2.x、Python 3.11。规则意图解析仍是默认确定性基线；OpenAI 意图解析必须显式启用。内存语义索引仍是 Embedding 服务的开发态替身。
+当前验证版本为 LangChain 1.3.x、LangChain Core 1.5.x、LangGraph 1.2.x、Python 3.11。`StructuredTool` 仍适用于不能修改原函数或需要动态组装同步/异步实现的场景，但本项目当前三个业务函数优先采用 `@tool`。内存语义索引仍是 Embedding 服务的开发态替身。
 
 官方参考：
 

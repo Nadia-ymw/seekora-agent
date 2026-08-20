@@ -5,7 +5,9 @@
 - Python 3.11+，公共函数和端口必须有类型标注；
 - 业务对象优先使用 dataclass，HTTP 边界使用 Pydantic；
 - application 使用 Protocol 描述外部依赖；
-- 工具使用 LangChain `BaseTool`/`StructuredTool`，返回包含状态、版本和数据的结构化字典；
+- 业务工具优先使用 LangChain `@tool`，自定义工作流统一通过 `ToolNode` 执行；
+- 模型只填写任务参数，租户、用户、ACL 等可信字段必须通过 `ToolRuntime` 注入；
+- 工具以 `content_and_artifact` 同时返回可读摘要和结构化 Artifact；
 - 所有 Item 必须使用 canonical `item_id`；
 - 硬约束和 ACL 必须在语义重排前确定性执行；
 - 同分排序必须有稳定的二级排序键，保证回放一致性。
@@ -14,7 +16,7 @@
 
 1. 在 `infrastructure/tools` 创建实现；
 2. 使用 Pydantic 定义参数 Schema；
-3. 通过 `StructuredTool.from_function` 创建同步或异步 Tool；
+3. 通过 `@tool` 创建 Tool；仅在运行时组装已有函数时使用 `StructuredTool`；
 4. 返回 `status`、`error_code`、`retryable`、`source_version` 和 `data`；
 5. 在 `bootstrap.py` 注入 RecallOrchestrator 或 Agent；
 6. 增加成功、Schema、权限、超时和部分失败测试；

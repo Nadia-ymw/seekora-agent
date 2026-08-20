@@ -1,6 +1,6 @@
 import unittest
 
-from langchain_core.tools import StructuredTool
+from langchain.tools import ToolRuntime, tool
 
 from seekora_agent.application.contracts import AgentQuery, ExecutionBudget, RequestContext
 from seekora_agent.application.recall import RecallOrchestrator
@@ -50,22 +50,26 @@ class FastPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CONSTRAINT_PRICE", receipt.filtered_reason_counts)
 
     async def test_single_recall_source_failure_degrades_gracefully(self):
-        async def good(query: str, top_k: int, tenant_id: str, user_id: str | None,
-                       allowed_permission_tags: list[str]) -> dict:
+        @tool("good", response_format="content_and_artifact")
+        async def good(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
             """Return one deterministic candidate."""
-            return {"status": "ok", "source_version": "good-v1", "data": {
+            del query, top_k, runtime
+            output = {"status": "ok", "source_version": "good-v1", "data": {
                 "candidates": [{"item_id": "one", "title": "Item", "score": 1.0}]
             }}
+            return "one candidate", output
 
-        async def bad(query: str, top_k: int, tenant_id: str, user_id: str | None,
-                      allowed_permission_tags: list[str]) -> dict:
+        @tool("bad", response_format="content_and_artifact")
+        async def bad(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
             """Raise a simulated source timeout."""
+            del query, top_k, runtime
             raise TimeoutError("simulated timeout")
 
-        tools = [
-            StructuredTool.from_function(coroutine=good, name="good", description="good"),
-            StructuredTool.from_function(coroutine=bad, name="bad", description="bad"),
-        ]
+        tools = [good, bad]
         result = await RecallOrchestrator(tools, source_tools=("good", "bad")).recall(
             "query",
             10,
@@ -74,7 +78,26 @@ class FastPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(["one"], [item.item_id for item in result.candidates])
         self.assertEqual("error", result.calls[1].status)
-        self.assertEqual("TOOL_EXECUTION_ERROR", result.calls[1].error_code)
+        self.assertEqual("TOOL_TRANSIENT_ERROR", result.calls[1].error_code)
+        self.assertTrue(result.calls[1].retryable)
+
+    async def test_programming_error_is_not_silently_degraded(self):
+        @tool("buggy", response_format="content_and_artifact")
+        async def buggy(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
+            """Raise a non-retryable programming error for boundary testing."""
+            del query, top_k, runtime
+            raise RuntimeError("simulated programming error")
+
+        recall = RecallOrchestrator([buggy], source_tools=("buggy",))
+        with self.assertRaisesRegex(RuntimeError, "simulated programming error"):
+            await recall.recall(
+                "query",
+                10,
+                RequestContext("request", "demo", None, ("public",)),
+                ExecutionBudget(),
+            )
 
 
 if __name__ == "__main__":

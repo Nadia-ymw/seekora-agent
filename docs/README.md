@@ -19,7 +19,7 @@
 - [服务端曝光清单与反馈归因](01-architecture/exposure-validation.md)：曝光生成、身份关联、服务端归因和删除传播。
 - [行为事件持久化队列](01-architecture/event-pipeline.md)：SQLite 队列、迟到策略、机器人过滤和事件重放。
 - [曝光行为训练样本与 LTR 特征契约](01-architecture/ltr-training.md)：分级标签、成熟窗口、防泄漏特征和时间切分。
-- [LangChain 迁移说明](01-architecture/langchain-migration.md)：StateGraph、StructuredTool、环境和扩展方式。
+- [LangChain 迁移说明](01-architecture/langchain-migration.md)：StateGraph、`@tool`、ToolNode、ToolRuntime 和扩展方式。
 
 ## 02 开发
 

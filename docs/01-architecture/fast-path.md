@@ -130,8 +130,9 @@ Receipt 新增：
 
 - `BM25Baseline`；
 - `InMemorySemanticIndex`；
-- LangChain `catalog_search` StructuredTool；
-- LangChain `vector_search` StructuredTool；
+- LangChain `@tool` 定义的 `catalog_search`；
+- LangChain `@tool` 定义的 `vector_search`；
+- ToolNode 注册执行与 ToolRuntime 可信上下文注入；
 - `RuleBasedIntentResolver`；
 - 可选的 `LangChainLLMIntentResolver` 与 `ChatOpenAI`；
 - `RecallOrchestrator`；

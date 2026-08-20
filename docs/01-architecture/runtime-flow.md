@@ -12,6 +12,7 @@ POST /agent/query
 → route 节点：根据可审计复杂度信号选择 Fast/Deep Path
 → Fast：recall 节点并行调用关键词、语义与可选的授权行为 Tool
 → Deep：probe → plan → deep_recall，以有界 DAG 执行依赖节点和有限多查询
+→ application/tool_registry.py：ToolNode 注入可信 Runtime 并执行工具
 → infrastructure/search/*：关键词和语义召回
 → recall 节点：RRF 融合
 → apply_constraints 节点：硬约束与 Catalog 最终复核

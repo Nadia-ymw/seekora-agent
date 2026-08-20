@@ -1,7 +1,7 @@
 import unittest
 from datetime import UTC, datetime
 
-from langchain_core.tools import StructuredTool
+from langchain.tools import ToolRuntime, tool
 
 from seekora_agent.application.behavior import (
     BehaviorConsentRequired,
@@ -12,6 +12,7 @@ from seekora_agent.application.profile import ProfileService
 from seekora_agent.application.exposure import ExposureService
 from seekora_agent.application.contracts import ExecutionBudget, RequestContext
 from seekora_agent.application.recall import RecallOrchestrator
+from seekora_agent.application.tool_registry import LangChainToolRegistry
 from seekora_agent.domain.behavior import BehaviorEvent
 from seekora_agent.domain.models import Item
 from seekora_agent.infrastructure.stores.memory import (
@@ -95,8 +96,10 @@ class BehaviorServiceTest(unittest.IsolatedAsyncioTestCase):
         await self.profile_service.update_consent("demo", "user-1", False, True)
         exposure = await self.register_exposure("lap-1")
 
-        created = await self.service.record(behavior_event(exposure_id=exposure.exposure_id))
-        duplicate = await self.service.record(behavior_event(exposure_id=exposure.exposure_id))
+        # 幂等重试必须保持载荷完全一致，避免两次生成 occurred_at 引入时间抖动。
+        event = behavior_event(exposure_id=exposure.exposure_id)
+        created = await self.service.record(event)
+        duplicate = await self.service.record(event)
         self.assertFalse(created.duplicate)
         self.assertTrue(duplicate.duplicate)
 
@@ -133,13 +136,12 @@ class BehaviorServiceTest(unittest.IsolatedAsyncioTestCase):
             [catalog_item("lap-public", ["public"]), catalog_item("lap-private", ["staff"])],
         )
 
-        output = await tool.ainvoke({
-            "query": "笔记本",
-            "top_k": 10,
-            "tenant_id": "demo",
-            "user_id": "user-1",
-            "allowed_permission_tags": ["public"],
-        })
+        execution = await LangChainToolRegistry([tool]).invoke(
+            "behavior_recall",
+            {"query": "笔记本", "top_k": 10},
+            RequestContext("request-1", "demo", "user-1", ("public",)),
+        )
+        output = execution.output
 
         self.assertEqual(
             ["lap-public"],
@@ -156,26 +158,23 @@ class BehaviorServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((), await self.store.list_by_user("demo", "user-1"))
 
     async def test_behavior_only_candidate_cannot_bypass_query_recall(self):
-        def static_tool(name: str, candidates: list[dict]) -> StructuredTool:
+        def static_tool(name: str, candidates: list[dict]):
+            @tool(name, response_format="content_and_artifact")
             async def invoke(
                 query: str,
-                top_k: int,
-                tenant_id: str,
-                user_id: str | None = None,
-                allowed_permission_tags: list[str] | None = None,
-            ) -> dict:
-                del query, top_k, tenant_id, user_id, allowed_permission_tags
-                return {
+                runtime: ToolRuntime[RequestContext],
+                top_k: int = 10,
+            ) -> tuple[str, dict]:
+                """Return static candidates for behavior grounding tests."""
+                del query, top_k, runtime
+                output = {
                     "status": "ok",
                     "source_version": "test-v1",
                     "data": {"candidates": candidates},
                 }
+                return "static candidates", output
 
-            return StructuredTool.from_function(
-                coroutine=invoke,
-                name=name,
-                description=f"Static {name} for behavior grounding test.",
-            )
+            return invoke
 
         catalog_candidate = {"item_id": "current-1", "title": "当前命中", "score": 1.0}
         behavior_candidates = [

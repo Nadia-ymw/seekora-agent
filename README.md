@@ -11,13 +11,14 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - Recall@K、MRR、NDCG@K 离线评测；
 - 30 条、6 个品类的固定样例目录，15 条 Golden Query、测试和基线报告生成入口。
 - 单 Agent Fast Path 运行时、Session、执行预算和取消；
-- LangChain `catalog_search` 与 `vector_search` StructuredTool；
+- LangChain `@tool` 定义业务工具，统一注册到 LangGraph `ToolNode`；
+- 租户、用户和 ACL 通过 `ToolRuntime` 注入，不暴露给模型填写；
 - Recommendation Receipt；
 - FastAPI + SSE 查询接口。
 - 规则意图与数值约束结构化；
 - 关键词/语义双路并行召回和 RRF；
 - 确定性 Constraint Engine 与最终 Catalog 校验。
-- LangGraph StateGraph 编排和 LangChain StructuredTool。
+- LangGraph StateGraph/ToolNode 编排和 LangChain `@tool` 工具契约。
 - 可选的 LangChain `ChatOpenAI` 结构化意图解析，以及失败时的规则回退。
 - 类 GPT 的同源 Web 测试台，可实时查看模型解析器、SSE 执行进度、结果和 Receipt。
 - 复杂度路由、Retrieval Probe、结构化计划和受预算约束的 Deep Path 多查询执行。

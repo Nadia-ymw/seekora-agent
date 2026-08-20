@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from collections import Counter
 
-from langchain_core.tools import StructuredTool
+from langchain.tools import ToolRuntime, tool
 
 from seekora_agent.application.contracts import ExecutionBudget, RequestContext
 from seekora_agent.application.dag import DeepPlanExecutor
@@ -15,41 +15,39 @@ def build_tracking_recall(failing_queries: set[str] | None = None):
     active_queries: Counter[str] = Counter()
     observation = {"max_parallel_queries": 0}
 
-    async def invoke(
-        query: str,
-        top_k: int,
-        tenant_id: str,
-        user_id: str | None,
-        allowed_permission_tags: list[str],
-    ) -> dict:
-        del top_k, tenant_id, user_id, allowed_permission_tags
-        active_queries[query] += 1
-        observation["max_parallel_queries"] = max(
-            observation["max_parallel_queries"],
-            sum(count > 0 for count in active_queries.values()),
-        )
-        await asyncio.sleep(0.01)
-        active_queries[query] -= 1
-        if query in failing_queries:
-            return {"status": "error", "error_code": "SIMULATED_FAILURE", "data": {}}
-        return {
-            "status": "ok",
-            "source_version": "dag-test-v1",
-            "data": {"candidates": [{
-                "item_id": f"{query}-item",
-                "title": query,
-                "score": 1.0,
-            }]},
-        }
+    def build_source(name: str):
+        @tool(name, response_format="content_and_artifact")
+        async def invoke(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
+            """Return a tracked DAG test candidate."""
+            del top_k, runtime
+            active_queries[query] += 1
+            observation["max_parallel_queries"] = max(
+                observation["max_parallel_queries"],
+                sum(count > 0 for count in active_queries.values()),
+            )
+            await asyncio.sleep(0.01)
+            active_queries[query] -= 1
+            if query in failing_queries:
+                output = {
+                    "status": "error", "error_code": "SIMULATED_FAILURE", "data": {}
+                }
+                return "simulated failure", output
+            output = {
+                "status": "ok",
+                "source_version": "dag-test-v1",
+                "data": {"candidates": [{
+                    "item_id": f"{query}-item",
+                    "title": query,
+                    "score": 1.0,
+                }]},
+            }
+            return "one candidate", output
 
-    tools = [
-        StructuredTool.from_function(
-            coroutine=invoke, name="source-a", description="DAG test source A"
-        ),
-        StructuredTool.from_function(
-            coroutine=invoke, name="source-b", description="DAG test source B"
-        ),
-    ]
+        return invoke
+
+    tools = [build_source("source-a"), build_source("source-b")]
     return RecallOrchestrator(tools, source_tools=("source-a", "source-b")), observation
 
 

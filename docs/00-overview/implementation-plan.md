@@ -98,7 +98,7 @@ POST /agent/query
 → runtime.py 创建请求、预算、Session 和 Receipt
 → workflow.py 执行 LangGraph Fast Path
 → intent resolver 生成结构化意图
-→ recall.py 并行调用 catalog_search、vector_search 与可选 behavior_recall StructuredTool
+→ recall.py 通过 ToolNode 并行调用 catalog_search、vector_search 与可选 behavior_recall
 → Constraint Engine 与 Catalog 复核
 → runtime.py 流式发送进度与结果
 → receipt.py 保存本次执行凭据
@@ -131,8 +131,9 @@ POST /agent/query
 使用 LangChain 建立统一工具边界：
 
 - Pydantic Schema 校验查询、Top-K、租户和权限参数；
-- LangChain `StructuredTool` 提供统一异步调用与 Tool Calling 协议；
-- `RecallOrchestrator` 检查重复/缺失工具，并并行调用 `BaseTool.ainvoke()`；
+- LangChain `@tool` 提供名称、描述、参数 Schema 和结构化 Artifact；
+- `LangChainToolRegistry` 把工具列表注册到 `ToolNode`，并注入可信 `ToolRuntime`；
+- `RecallOrchestrator` 只提交查询与 Top-K，并行执行和融合工具结果；
 - Tool 结构化返回状态、错误码、是否可重试、数据源版本和候选；
 - BM25、语义索引和授权行为分别包装为只读 `catalog_search`、`vector_search`、`behavior_recall`。
 
@@ -183,7 +184,7 @@ POST /agent/query
 
 1. 从 `SEEKORA_CATALOG_PATH` 或样例路径加载目录；
 2. 建立 BM25 基线；
-3. 创建 `catalog_search`、`vector_search` 与 `behavior_recall` StructuredTool；
+3. 使用 `@tool` 创建 `catalog_search`、`vector_search` 与 `behavior_recall`，注册到 `ToolNode`；
 4. 创建 RecallOrchestrator 并装配三个召回工具，匿名请求跳过行为工具；
 5. 装配意图解析、RRF、约束引擎和 Catalog Repository；
 6. 创建 Agent Runtime 并导出 Uvicorn 可发现的全局 `app`。

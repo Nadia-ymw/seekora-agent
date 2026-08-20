@@ -15,6 +15,7 @@ src/seekora_agent/
 │   ├── constraints.py
 │   ├── intent.py
 │   ├── recall.py
+│   ├── tool_registry.py
 │   ├── receipt.py
 │   ├── runtime.py
 │   ├── session.py
@@ -70,7 +71,8 @@ evaluation ────────────────→ domain + search a
 | `application/contracts.py` | Agent 请求、事件、预算和控制异常 | FastAPI/Pydantic 请求模型 |
 | `application/runtime.py` | 消费 LangGraph 更新并映射 SSE/Receipt | 创建具体基础设施 |
 | `application/workflow.py` | 定义并编译 Fast Path StateGraph | HTTP 和具体搜索引擎 SDK |
-| `application/recall.py` | 并行调用 LangChain Tool 与 RRF | 具体搜索引擎 SDK |
+| `application/recall.py` | 选择召回工具、并行调用和 RRF | 具体搜索引擎 SDK |
+| `application/tool_registry.py` | 将工具注册到 ToolNode，并通过 ToolRuntime 注入可信上下文 | 具体搜索实现和模型工具选择策略 |
 | `application/constraints.py` | 硬约束与最终目录复核 | 自然语言约束猜测 |
 | `application/session.py` | Session 模型和 Store/Cancellation 端口 | Redis 实现 |
 | `application/receipt.py` | Receipt 模型和持久化端口 | 数据库实现 |
@@ -78,7 +80,7 @@ evaluation ────────────────→ domain + search a
 | `infrastructure/search/bm25.py` | 阶段 0 BM25 和确定性过滤 | HTTP 路由、Session 管理 |
 | `infrastructure/catalog.py` | JSONL 数据加载和质量检查 | Agent 编排 |
 | `infrastructure/stores/memory.py` | 本地 Session、Receipt、取消适配器 | 生产持久化承诺 |
-| `infrastructure/tools/catalog_search.py` | 将 BM25 包装为 LangChain StructuredTool | 工具选择策略 |
+| `infrastructure/tools/catalog_search.py` | 用 `@tool` 定义 BM25 工具，仅暴露任务参数 | 工具选择策略和身份参数生成 |
 | `infrastructure/intent/langchain_llm.py` | 结构化 LLM 意图解析、类型标准化和规则回退 | 召回、排序或最终约束裁决 |
 | `infrastructure/llm/openai.py` | 根据安全配置创建 LangChain `ChatOpenAI` | Prompt 与领域决策 |
 | `interfaces/http/api.py` | FastAPI、SSE 和 HTTP 校验 | 业务排序和权限推断 |

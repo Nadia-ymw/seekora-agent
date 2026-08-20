@@ -46,10 +46,10 @@ class RecommendationReceipt:
     filtered_reason_counts: dict[str, int] = field(default_factory=dict)
     error_code: str | None = None
     config_versions: dict[str, str] = field(default_factory=lambda: {
-        "agent": "0.16.0",
-        "workflow": "langgraph-dual-path-v5",
+        "agent": "0.17.0",
+        "workflow": "langgraph-dual-path-v6",
         "prompt": "none",
-        "tool_policy": "v1",
+        "tool_policy": "langchain-toolnode-v2",
         "ranker": "rrf-v1",
     })
 

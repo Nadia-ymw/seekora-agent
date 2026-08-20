@@ -10,6 +10,7 @@ from typing import Any, Sequence
 from langchain_core.tools import BaseTool
 
 from ..domain.fast_path import FusedCandidate
+from .tool_registry import LangChainToolRegistry
 from .contracts import ExecutionBudget, RequestContext
 
 # 单词召回调用记录
@@ -48,35 +49,24 @@ class RecallOrchestrator:
         source_tools: tuple[str, ...] = ("catalog_search", "vector_search"),
         rrf_k: int = 60,   # 设置RRF参数
     ) -> None:
-        # 工具注册
-        self.tools: dict[str, BaseTool] = {}
-        for tool in tools:
-            if tool.name in self.tools:
-                raise ValueError(f"tool already registered: {tool.name}")
-            self.tools[tool.name] = tool
+        # 工具统一注册到 LangGraph ToolNode，不再由编排器手工执行 BaseTool。
+        self.registry = LangChainToolRegistry(tools)
+        self.tools = self.registry.tools
         missing = sorted(set(source_tools) - self.tools.keys())
         if missing:
             raise ValueError(f"missing recall tools: {', '.join(missing)}")
         self.source_tools = source_tools
         self.rrf_k = rrf_k
     # 单工具调用
-    async def _invoke(self, tool_name: str, arguments: dict[str, Any]) -> RecallCall:
+    async def _invoke(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        context: RequestContext,
+    ) -> RecallCall:
         started = perf_counter()
-        try:
-            output = await self.tools[tool_name].ainvoke(arguments)
-            if not isinstance(output, dict):
-                raise TypeError(f"tool {tool_name} must return a dict")
-            return RecallCall(
-                tool=tool_name,
-                arguments=arguments,
-                status=str(output.get("status", "error")),
-                data=dict(output.get("data", {})),
-                latency_ms=int((perf_counter() - started) * 1_000),
-                source_version=str(output.get("source_version", "unknown")),
-                error_code=output.get("error_code"),
-                retryable=bool(output.get("retryable", False)),
-            )
-        except Exception:
+        execution = await self.registry.invoke(tool_name, arguments, context)
+        if execution.status != "ok":
             return RecallCall(
                 tool=tool_name,
                 arguments=arguments,
@@ -84,9 +74,20 @@ class RecallOrchestrator:
                 data={},
                 latency_ms=int((perf_counter() - started) * 1_000),
                 source_version="unknown",
-                error_code="TOOL_EXECUTION_ERROR",
-                retryable=True,
+                error_code=execution.error_code,
+                retryable=execution.error_code == "TOOL_TRANSIENT_ERROR",
             )
+        output = execution.output
+        return RecallCall(
+            tool=tool_name,
+            arguments=arguments,
+            status=str(output.get("status", "error")),
+            data=dict(output.get("data", {})),
+            latency_ms=int((perf_counter() - started) * 1_000),
+            source_version=str(output.get("source_version", "unknown")),
+            error_code=output.get("error_code"),
+            retryable=bool(output.get("retryable", False)),
+        )
 
     async def recall(
         self,
@@ -99,9 +100,6 @@ class RecallOrchestrator:
         arguments = {
             "query": query,
             "top_k": min(top_k * 3, 50),
-            "tenant_id": context.tenant_id,
-            "user_id": context.user_id,
-            "allowed_permission_tags": list(context.allowed_permission_tags),
         }
         # 未登录请求没有稳定 user_id，不调用行为召回，避免无意义的工具成本。
         active_sources = tuple(
@@ -114,7 +112,8 @@ class RecallOrchestrator:
             budget.consume_tool_call()
         # 并行调用
         calls = tuple(await asyncio.gather(*(
-            self._invoke(tool_name, dict(arguments)) for tool_name in active_sources
+            self._invoke(tool_name, dict(arguments), context)
+            for tool_name in active_sources
         )))
         successful = [call for call in calls if call.status == "ok"]
         if not successful:

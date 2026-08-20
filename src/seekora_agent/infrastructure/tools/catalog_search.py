@@ -4,41 +4,43 @@
 """
 from __future__ import annotations
 
-from langchain_core.tools import BaseTool, StructuredTool
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from langchain.tools import ToolRuntime, tool
+from langchain_core.tools import BaseTool
+from pydantic import Field
 
 from ...domain.models import SearchQuery
+from ...application.contracts import RequestContext
 from ..search.bm25 import BM25Baseline
-
-
-class CatalogSearchInput(BaseModel):
-    query: str = Field(min_length=1, description="Normalized search query")
-    top_k: int = Field(default=10, ge=1, le=50)
-    tenant_id: str = Field(min_length=1)
-    user_id: str | None = None
-    allowed_permission_tags: list[str] = Field(default_factory=lambda: ["public"])
 
 
 def build_catalog_search_tool(
     baseline: BM25Baseline, source_version: str = "sample-v1"
 ) -> BaseTool:
+    @tool(
+        "catalog_search",
+        response_format="content_and_artifact",
+    )
     async def catalog_search(
-        query: str,
-        top_k: int,
-        tenant_id: str,
-        user_id: str | None = None,
-        allowed_permission_tags: list[str] | None = None,
-    ) -> dict:
-        """Search the authoritative catalog using lexical BM25 retrieval."""
-        del user_id
+        query: Annotated[
+            str, Field(min_length=1, description="经过规范化的商品关键词查询")
+        ],
+        runtime: ToolRuntime[RequestContext],
+        top_k: Annotated[
+            int, Field(ge=1, le=50, description="最多返回的候选数量")
+        ] = 10,
+    ) -> tuple[str, dict]:
+        """使用 BM25 搜索权威商品目录，适合名称、品牌和属性关键词召回。"""
+        context = runtime.context
         # 执行BM25搜索
         results = baseline.search(SearchQuery(
             text=query,
-            tenant_id=tenant_id,
-            allowed_permission_tags=tuple(allowed_permission_tags or ["public"]),
+            tenant_id=context.tenant_id,
+            allowed_permission_tags=context.allowed_permission_tags,
         ), top_k)
         # 返回格式化结果
-        return {
+        artifact = {
             "status": "ok",
             "source_version": source_version,
             "data": {"candidates": [
@@ -51,10 +53,6 @@ def build_catalog_search_tool(
                 for result in results
             ]},
         }
+        return f"BM25 召回 {len(results)} 个候选", artifact
 
-    return StructuredTool.from_function(
-        coroutine=catalog_search,
-        name="catalog_search",
-        description="Lexically search catalog items with tenant and ACL enforcement.",
-        args_schema=CatalogSearchInput,
-    )
+    return catalog_search
