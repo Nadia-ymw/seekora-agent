@@ -12,6 +12,7 @@ from uuid import uuid4
 from .behavior import BehaviorService
 from .contracts import AgentEvent, AgentQuery, BudgetExceeded, ExecutionBudget, RequestCancelled
 from .exposure import ExposureService
+from .idempotency import RequestReplayStore, request_fingerprint
 from .profile import ProfileService
 from .receipt import ReceiptStore, RecommendationReceipt, ToolCallReceipt
 from .session import CancellationRegistry, SessionIntentSnapshot, SessionMessage, SessionStore
@@ -30,6 +31,7 @@ class AgentRuntime:
         behaviors: BehaviorService | None = None,
         exposures: ExposureService | None = None,
         test_account: TestUserAccount | None = None,
+        request_replays: RequestReplayStore | None = None,
     ) -> None:
         self.workflow = workflow
         self.sessions = sessions
@@ -39,6 +41,7 @@ class AgentRuntime:
         self.behaviors = behaviors
         self.exposures = exposures
         self.test_account = test_account
+        self.request_replays = request_replays
 
     async def _ensure_active(self, request_id: str) -> None:
         if await self.cancellations.is_cancelled(request_id):
@@ -46,6 +49,65 @@ class AgentRuntime:
 
     async def run(self, query: AgentQuery) -> AsyncIterator[AgentEvent]:
         request_id = uuid4().hex
+        if query.client_request_id is None or self.request_replays is None:
+            async for event in self._run_once(query, request_id):
+                yield event
+            return
+
+        reservation = await self.request_replays.reserve(
+            query.tenant_id,
+            query.client_request_id,
+            request_fingerprint(query),
+            request_id,
+        )
+        if reservation.action == "replay":
+            for event in reservation.events:
+                yield event
+            return
+        if reservation.action in {"conflict", "in_progress"}:
+            error_code = (
+                "CLIENT_REQUEST_ID_CONFLICT"
+                if reservation.action == "conflict"
+                else "CLIENT_REQUEST_IN_PROGRESS"
+            )
+            yield AgentEvent("error", request_id, {
+                "error_code": error_code,
+                "existing_request_id": reservation.request_id,
+                "retryable": reservation.action == "in_progress",
+            })
+            yield AgentEvent("done", request_id, {
+                "status": "rejected",
+                "receipt_id": None,
+                "tool_calls": 0,
+            })
+            return
+
+        events: list[AgentEvent] = []
+        completed = False
+        try:
+            async for event in self._run_once(query, request_id):
+                events.append(event)
+                yield event
+            completed = True
+        finally:
+            if completed:
+                await self.request_replays.complete(
+                    query.tenant_id,
+                    query.client_request_id,
+                    request_id,
+                    tuple(events),
+                )
+            else:
+                # 客户端断开或生成器被取消时释放占用，后续同 ID 可以重新执行。
+                await self.request_replays.release(
+                    query.tenant_id,
+                    query.client_request_id,
+                    request_id,
+                )
+
+    async def _run_once(
+        self, query: AgentQuery, request_id: str
+    ) -> AsyncIterator[AgentEvent]:
         # 创建执行预算（包含最大工具调用次数、截止时间等）
         budget = ExecutionBudget()
         receipt = RecommendationReceipt(
@@ -102,6 +164,10 @@ class AgentRuntime:
                     context = payload["session_context"]
                     receipt.resolved_intent = intent.as_dict()
                     receipt.session_context = context
+                    receipt.constraint_lifecycle = {
+                        "changes": context["lifecycle_changes"],
+                        "conflicts": context["conflicts"],
+                    }
                     # 解析结果属于本次会话任务；即使存在用户画像，也禁止在这里隐式写入。
                     await self.sessions.set_intent(
                         session,
@@ -109,6 +175,11 @@ class AgentRuntime:
                     )
                     if context["applied"]:
                         yield AgentEvent("session.context_applied", request_id, context)
+                    if context["lifecycle_changes"] or context["conflicts"]:
+                        yield AgentEvent("constraints.lifecycle", request_id, {
+                            "changes": context["lifecycle_changes"],
+                            "conflicts": context["conflicts"],
+                        })
                     yield AgentEvent("intent.resolved", request_id, intent.as_dict())
                 elif node_name == "route":
                     decision = payload["route_decision"]
@@ -172,14 +243,34 @@ class AgentRuntime:
                 elif node_name == "apply_constraints": # 约束过滤
                     filtered = payload["filter_result"]
                     receipt.filtered_reason_counts = filtered.filtered_reason_counts
+                    receipt.relaxation_suggestions = list(filtered.relaxation_suggestions)
+                    if filtered.conflicts:
+                        receipt.constraint_lifecycle["conflicts"] = list(filtered.conflicts)
                     yield AgentEvent("constraints.applied", request_id, {
                         "accepted_count": min(len(filtered.accepted), query.top_k),
                         "filtered_reason_counts": filtered.filtered_reason_counts,
+                        "conflicts": list(filtered.conflicts),
+                        "relaxation_suggestions": list(filtered.relaxation_suggestions),
                     })
                 elif node_name == "assess_sufficiency":
                     assessment = payload["sufficiency"]
                     receipt.sufficiency_assessments.append(assessment.as_dict())
                     yield AgentEvent("sufficiency.assessed", request_id, assessment.as_dict())
+                elif node_name == "enrich_result":
+                    call = payload["item_detail_call"]
+                    if call["status"] != "skipped":
+                        receipt.tool_calls.append(ToolCallReceipt(
+                            tool=call["tool"],
+                            arguments=call["arguments"],
+                            status=call["status"],
+                            latency_ms=call["latency_ms"],
+                            source_version=call["source_version"],
+                            error_code=call["error_code"],
+                        ))
+                    yield AgentEvent("item_details.completed", request_id, {
+                        "status": call["status"],
+                        "item_count": len(payload["item_details"]),
+                    })
                 # 结果组装
                 elif node_name == "compose_result":
                     final_items = [dict(item) for item in payload["items"]]

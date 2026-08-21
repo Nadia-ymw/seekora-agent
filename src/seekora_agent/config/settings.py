@@ -31,6 +31,27 @@ class AppSettings(BaseSettings):
     behavior_queue_path: str | None = Field(
         default=None, alias="SEEKORA_BEHAVIOR_QUEUE_PATH"
     )
+    profile_db_path: str | None = Field(
+        default=None, alias="SEEKORA_PROFILE_DB_PATH"
+    )
+    request_replay_db_path: str | None = Field(
+        default=None, alias="SEEKORA_REQUEST_REPLAY_DB_PATH"
+    )
+    session_db_path: str | None = Field(
+        default=None, alias="SEEKORA_SESSION_DB_PATH"
+    )
+    session_ttl_seconds: int = Field(
+        default=86_400, ge=300, alias="SEEKORA_SESSION_TTL_SECONDS"
+    )
+    session_max_messages: int = Field(
+        default=40, ge=2, le=500, alias="SEEKORA_SESSION_MAX_MESSAGES"
+    )
+    receipt_db_path: str | None = Field(
+        default=None, alias="SEEKORA_RECEIPT_DB_PATH"
+    )
+    receipt_retention_seconds: int = Field(
+        default=30 * 86_400, ge=3600, alias="SEEKORA_RECEIPT_RETENTION_SECONDS"
+    )
 
     def require_openai(self) -> tuple[str, str]:
         if self.openai_api_key is None or not self.openai_api_key.get_secret_value().strip():
@@ -56,4 +77,11 @@ class AppSettings(BaseSettings):
             "openai_max_retries": self.openai_max_retries,
             "openai_api_key_configured": key_configured,
             "behavior_queue_path": self.behavior_queue_path,
+            "profile_db_path": self.profile_db_path,
+            "request_replay_db_path": self.request_replay_db_path,
+            "session_db_path": self.session_db_path,
+            "session_ttl_seconds": self.session_ttl_seconds,
+            "session_max_messages": self.session_max_messages,
+            "receipt_db_path": self.receipt_db_path,
+            "receipt_retention_seconds": self.receipt_retention_seconds,
         }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..domain.deep_path import DeepPlan, PlanStep, ProbeSummary, RouteDecision
 from ..domain.fast_path import ResolvedIntent
+from .constraints import active_constraints
 from .contracts import ExecutionBudget, RequestContext
 from .recall import RecallOrchestrator, RecallResult
 
@@ -27,7 +28,7 @@ class ComplexityRouter:
         if len(intent.ambiguities) >= 2:
             reasons.append("multiple_ambiguities")
         # 硬约束过多
-        if len(intent.hard_constraints) >= 3:
+        if len(active_constraints(intent.hard_constraints)) >= 3:
             reasons.append("many_hard_constraints")
         return RouteDecision("deep" if reasons else "fast", tuple(reasons or ["simple_query"]))
 

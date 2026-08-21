@@ -39,7 +39,7 @@ GET /agent/dev/account
 - `/agent/dev/account` 是只读开发接口，不是认证接口；
 - 账户仍只拥有公共目录权限，不能绕过 Item ACL；
 - 测试账户开启 Consent 只为了覆盖联调链路，其他新用户仍默认关闭；
-- Profile 使用内存存储，删除后会在下次进程启动时重新初始化；
+- Profile 使用 SQLite 持久化；普通用户删除后不会因进程重启而恢复，开发账户若被删除则会在下次启动时按测试种子重新写入；
 - 生产部署必须禁用开发账户和该接口，并接入可信认证网关。
 
 ## 新增文件职责
@@ -48,4 +48,4 @@ GET /agent/dev/account
 - `tests/test_demo_account.py`：验证账户初始化、授权画像、新用户隐私默认值和无认证秘密。
 - `docs/02-development/demo-account.md`：提供账户字段、使用示例、安全边界和文件职责说明。
 
-`InMemoryProfileStore` 同时增加了显式初始 Profile 注入能力。它只接受启动层传入的数据，不会为普通用户自动开启授权。
+`SQLiteProfileStore` 支持显式初始 Profile 注入，并使用 `INSERT OR IGNORE`，不会覆盖已存在账户的授权与偏好。它只接受启动层传入的数据，不会为普通用户自动开启授权。

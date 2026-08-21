@@ -10,10 +10,11 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 确定性结构化过滤；
 - Recall@K、MRR、NDCG@K 离线评测；
 - 30 条、6 个品类的固定样例目录，15 条 Golden Query、测试和基线报告生成入口。
-- 单 Agent Fast Path 运行时、Session、执行预算和取消；
+- 单 Agent Fast Path 运行时、SQLite Session、执行预算和取消；
 - LangChain `@tool` 定义业务工具，统一注册到 LangGraph `ToolNode`；
 - 租户、用户和 ACL 通过 `ToolRuntime` 注入，不暴露给模型填写；
-- Recommendation Receipt；
+- SQLite Recommendation Receipt，支持跨进程重启查询与保留期清理；
+- 基于 `client_request_id` 的 SQLite 请求幂等、并发保护和完整 SSE 回放；
 - FastAPI + SSE 查询接口。
 - 规则意图与数值约束结构化；
 - 关键词/语义双路并行召回和 RRF；
@@ -26,11 +27,14 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - 有界 Deep Plan DAG、节点依赖、并发限制、停止条件和独立分支故障降级。
 - Session Intent 与长期 Profile 分离，个性化和行为存储默认关闭并要求显式授权。
 - 多轮会话由结构化 AI 生成 ConstraintPatch、确定性 Reducer 执行，支持修改、追加、删除和清空，并保留规则降级。
+- Constraint 支持作用域、来源、轮次、状态、优先级和过期时间；支持跨轮过期、跨类目挂起/恢复、冲突检测及需确认的最小放宽建议。
 - 用户画像查询、授权、显式偏好更新和删除 API，支持租户隔离。
+- SQLite 持久化长期画像，服务重启后保留显式授权和偏好。
 - 曝光/点击等行为事件的授权写入、幂等去重、删除传播和 ACL 安全行为召回。
 - 服务端曝光清单、反馈身份/商品/位置校验，以及可信召回来源和模型版本归因。
 - SQLite 持久化反馈队列、24 小时迟到水位线、异常时间拒绝、机器人过滤和幂等重放。
-- 曝光—行为 LTR 训练样本、7 天成熟窗口、版本化基础特征和防泄漏时间切分。
+- 批量 Item Detail 工具和基于权威目录事实的可追溯解释链路。
+- 曝光—行为排序评测样本、7 天成熟窗口、版本化基础特征和防泄漏时间切分；不进行 LTR 模型训练。
 - KuaiSearch-Lite 电子数码商品的流式转换、确定性开发采样、合成测试规格和数据质量报告。
 - 预置 `demo / seekora-demo-user` 本地测试账户，可直接覆盖曝光、反馈和行为召回链路。
 

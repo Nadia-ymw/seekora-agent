@@ -45,7 +45,10 @@ def item_is_allowed(item: Item, query: SearchQuery) -> bool:
     if item.permission_tags:
         if not set(item.permission_tags).intersection(query.allowed_permission_tags):
             return False
-    return all(_compare(item.field_value(rule.field), rule) for rule in query.constraints)
+    return all(
+        _compare(item.field_value(rule.field), rule)
+        for rule in query.constraints if rule.is_active()
+    )
 
 
 class BM25Baseline:

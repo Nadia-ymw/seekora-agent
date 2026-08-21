@@ -18,7 +18,7 @@
 | 1. Agent 基础平台 | 1～2 周 | FastAPI/SSE、Session、Context、Tool Registry、预算、取消、Trace、Receipt | `/agent/query`、工具契约、回放骨架 | 端到端链路和 Contract Test 通过 |
 | 2. Fast Path MVP | 2～3 周 | 意图与约束结构化；关键词/向量并行召回；RRF；约束引擎；Ranker；Evidence-only 解释 | Fast Path、结果卡片、降级策略 | MVP 离线质量与 TP95 门禁通过 |
 | 3. Grounded Deep Path | 2～3 周 | Retrieval Probe、复杂度路由、结构化 Planner、DAG 执行、一次 Replan、澄清与拒答 | Deep Path、预算与停止条件 | 复杂集显著优于 Fast Path，简单流量不退化 |
-| 4. Profile 与反馈闭环 | 2～3 周 | Session/Profile 分离；Consent；曝光反馈；行为召回；LTR；Teacher/Judge | Profile API、反馈管道、训练集与模型 | 用户可控制，分群无明显伤害 |
+| 4. Profile 与反馈闭环 | 2～3 周 | Session/Profile 分离；Consent；曝光反馈；行为召回；开源 Cross-Encoder/在线轻量重排服务评测 | Profile API、反馈管道、排序评测集与可降级重排器 | 用户可控制，分群无明显伤害 |
 | 5. 上线准备 | 1～2 周 | 安全、故障注入、负载、Shadow、Canary、A/B、Runbook、Kill Switch | 测试报告、Dashboard、回滚方案 | 发布门禁全部通过 |
 
 ## 3. 数据获取与治理
@@ -37,11 +37,11 @@
 
 从脱敏真实查询分层抽样，并补充复杂、歧义、冲突、不可满足、越权和 Prompt Injection 场景。每条查询标注意图、硬约束、软偏好、分级相关 Item、禁止出现 Item、是否澄清和期望证据。两人独立标注、分歧仲裁，测试集固定且不参与 Prompt 调优。
 
-首批 300～500 条；稳定后扩展到 2,000 条高价值样本。LLM 弱标签仅用于扩充训练数据，不能直接替代人工 Golden Set。
+首批 300～500 条；稳定后扩展到 2,000 条高价值样本。LLM 弱标签只可用于辅助分析和候选预筛，不能替代人工 Golden Set，也不用于本项目的 LTR 训练。
 
 ### 3.4 外部证据
 
-仅访问允许的数据源，保存来源 URI、抓取时间、内容哈希、权限和信任等级。网页和 Item 文本均视为不可信输入。MVP 实现工具接口但默认关闭外部 Web，完成 SSRF、版权和 Prompt Injection 评审后按 Feature Flag 开放。
+优先接入成熟外部 Web Search Tool/API，保存来源 URI、发布时间/检索时间、供应商版本、权限和信任等级。外部摘要、网页片段和 Item 文本均视为不可信输入。MVP 默认关闭外部 Web，完成来源策略、版权和 Prompt Injection 评审后按 Feature Flag 开放；只有工具支持直接 URL 抓取时才建设 SSRF/DNS/重定向防护。
 
 ## 4. 测试计划
 
@@ -121,7 +121,7 @@ POST /agent/query
 
 - `SessionMessage` 保存角色、内容、请求 ID 和时间；
 - `SessionState` 保存租户隔离的消息列表和版本；
-- `InMemorySessionStore` 用异步锁保护并发读写；
+- `SQLiteSessionStore` 默认持久化会话，使用版本比较交换保护并发写入，并支持 TTL 和消息裁剪；测试仍可使用 `InMemorySessionStore`；
 - `CancellationRegistry` 接收取消请求，运行时在工具调用前后检查状态。
 
 当前实现只用于单进程开发和测试，服务重启后数据会消失。生产环境需要替换为 Redis/数据库实现，并加入 TTL、并发版本检查和历史压缩。
@@ -145,9 +145,9 @@ POST /agent/query
 
 - `ToolCallReceipt` 记录工具名、参数、状态、耗时、错误码和数据版本；
 - `RecommendationReceipt` 记录请求、路由、候选 ID、配置版本和最终状态；
-- `InMemoryReceiptStore` 提供开发态写入和查询。
+- `SQLiteReceiptStore` 提供默认持久化写入、跨重启查询和保留期清理；测试仍可使用 `InMemoryReceiptStore`。
 
-当前 Receipt 仍在内存中。生产实现需要不可变持久化、脱敏/加密、保留策略以及数据/索引/模型/Prompt 完整版本。
+当前 Receipt 已在单实例 SQLite 中持久化并具备保留策略。生产实现仍需要集中不可变存储、脱敏/加密、删除审计，以及数据/索引/模型/Prompt 完整版本。
 
 ### 7.5 `application/runtime.py`
 
@@ -196,7 +196,7 @@ POST /agent/query
 - `tests/test_runtime.py`：验证预算上限、工具重名、事件顺序、Session 写入、Receipt 和取消；
 - `tests/test_api.py`：验证健康检查、SSE 查询、Receipt 查询和非法请求 422。
 
-当前共 70 个自动化测试，统一在 `seekora-agent` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
+当前共 111 个自动化测试，统一在 `nanobot` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
 
 ### 7.9 可选 LLM 意图解析增量
 
@@ -236,10 +236,10 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 ### 7.11 阶段 2 边界
 
-- 目前已有 `catalog_search`、`vector_search` 和授权行为召回，尚未加入 Item Detail 工具；
+- 目前已有 `catalog_search`、`vector_search`、授权行为召回和最终结果 `item_detail` 工具；
 - LLM 意图解析已提供可选 OpenAI 实现，但尚未用真实 Golden Set 完成模型质量和成本评估；
-- Session、取消和 Receipt 是单进程内存实现；
-- `client_request_id` 已进入协议但尚未实现幂等缓存；
+- Session 与 Receipt 已使用单实例 SQLite；取消、Exposure 和行为聚合仍是单进程内存实现；
+- `client_request_id` 已接入 SQLite 幂等存储，支持跨重启 SSE 回放、载荷冲突和处理中保护；
 - Trace 目前只有请求事件、工具耗时和 Receipt，尚未接 OpenTelemetry；
 - 取消是协作式检查，长耗时工具还需要支持超时和主动中止；
 - 没有认证 Gateway，当前 API 仅适合本地开发；
@@ -275,7 +275,7 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 第四个增量完成行为事件处理管道：使用 SQLite 先持久化再投递行为 Store；区分正常、24 小时以上迟到和超过 30 天拒绝的事件；拦截明显机器人 User-Agent；记录 `pending/processed/failed`、尝试次数和错误摘要，并支持幂等重放。删除 Profile 会同步删除队列载荷。
 
-第五个增量完成曝光—行为训练样本生成器、基础 LTR 特征契约和确定性时间切分：只使用曝光时保存的召回分数，按 7 天成熟窗口构造分级标签，复核事件身份与归因范围，并以固定时间边界切分训练、验证和测试集，避免行为结果、未成熟负样本或随机切分造成数据泄漏。
+第五个增量完成曝光—行为排序评测样本生成器、基础特征契约和确定性时间切分：只使用曝光时保存的召回分数，按 7 天成熟窗口构造分级标签，复核事件身份与归因范围，并以固定时间边界切分开发、验证和测试集，避免行为结果、未成熟负样本或随机切分造成数据泄漏。该数据契约用于评测开源/在线重排器，不再规划 LTR 模型训练。
 
 为简化阶段 4 的端到端联调，默认 Bootstrap 还会初始化无密码、无 Token 的 `demo / seekora-demo-user` 测试账户，并预置明确授权的 Profile。该能力仅用于本地开发，不属于正式用户管理或认证设计。
 
@@ -283,4 +283,10 @@ Deep Path 在 `routing.completed` 后额外发送 `probe.completed` 和 `plan.cr
 
 随后将多轮理解简化为“结构化 AI Patch + 确定性 Reducer”：AI 只判断新任务/追问并输出 `set/add/remove/clear` 操作，Reducer 负责字段白名单、类型标准化和状态修改；模型失败或输出非法时回退到轻量规则。该方案直接调用已配置模型，不需要训练 LTR 或其他模型。
 
-详细设计和新增文件职责见 [Session Intent、Profile 与 Consent](../01-architecture/profile-consent.md)、[多轮 Session 约束上下文](../01-architecture/session-context.md)、[行为反馈与授权召回](../01-architecture/behavior-feedback.md)、[服务端曝光清单与反馈归因](../01-architecture/exposure-validation.md)、[行为事件持久化队列](../01-architecture/event-pipeline.md) 和 [曝光行为训练样本与 LTR 特征契约](../01-architecture/ltr-training.md)。由于当前不具备模型训练条件，LTR Ranker、位置偏差校正和 Teacher/Judge 暂缓；下一步优先实现不依赖训练的 Item Detail 与证据解释链路。
+第七个增量完成 Item Detail 与证据解释链路：最终候选通过批量 LangChain 工具读取权威目录详情，再次校验租户、状态和 ACL；解释由确定性 Composer 组合召回依据、约束证据和目录事实，不调用模型自由生成。同时长期 Profile 从内存迁移到 SQLite，以联合主键隔离租户用户并支持重启恢复和删除。
+
+第八个增量完成客户端请求幂等：以 `tenant_id + client_request_id` 原子占用执行权，将完整 SSE 保存到 SQLite；相同载荷跨重启直接回放，不重复写 Session、调用工具或生成曝光，不同载荷复用 ID 和处理中并发重试均被明确拒绝。
+
+第九个增量完成 SQLite Session 与 Receipt：会话消息、最近意图和版本支持 TTL、最大消息数裁剪、身份隔离、乐观并发和重启恢复；完整执行回执支持跨重启查询、状态索引和保留期清理。默认装配使用 `.runtime/sessions.sqlite3` 与 `.runtime/receipts.sqlite3`。
+
+详细设计和新增文件职责见 [Session Intent、Profile 与 Consent](../01-architecture/profile-consent.md)、[多轮 Session 约束上下文](../01-architecture/session-context.md)、[行为反馈与授权召回](../01-architecture/behavior-feedback.md)、[服务端曝光清单与反馈归因](../01-architecture/exposure-validation.md)、[行为事件持久化队列](../01-architecture/event-pipeline.md)、[曝光行为排序评测样本与特征契约](../01-architecture/ltr-training.md) 和 [Item Detail 与证据解释链路](../01-architecture/item-detail-evidence.md)。后续直接接入开源 Cross-Encoder 或在线轻量小模型服务，并提供 RRF 降级；不开发 LTR 训练、发布或线上 LTR 推理链路。

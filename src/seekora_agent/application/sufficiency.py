@@ -34,6 +34,14 @@ class ResultSufficiencyEvaluator:
                 supported_count,
                 replan_count,
             )
+        if filtered.conflicts:
+            return SufficiencyAssessment(
+                "refuse",
+                "constraint_conflict",
+                accepted_count,
+                supported_count,
+                replan_count,
+            )
         # 判断是否重规划
         if can_replan and replan_count < max_replans:
             return SufficiencyAssessment(
@@ -75,7 +83,10 @@ class ResultSufficiencyEvaluator:
         return tuple(questions[:2])
 
     @staticmethod
-    def terminal_decision(assessment: SufficiencyAssessment) -> TerminalDecision:
+    def terminal_decision(
+        assessment: SufficiencyAssessment,
+        relaxation_suggestions: tuple[dict[str, object], ...] = (),
+    ) -> TerminalDecision:
         if assessment.action == "clarify":
             return TerminalDecision(
                 action="clarify",
@@ -89,4 +100,5 @@ class ResultSufficiencyEvaluator:
             action="refuse",
             reason=assessment.reason,
             message="目录中没有同时满足硬约束且证据充分的商品。",
+            relaxation_suggestions=relaxation_suggestions,
         )

@@ -48,6 +48,14 @@ class SessionStore(Protocol):
     async def get(self, tenant_id: str, session_id: str) -> SessionState | None: ...
 
 
+class SessionVersionConflict(RuntimeError):
+    """同一 Session 被并发更新，当前快照已过期。"""
+
+
+class SessionIdentityConflict(PermissionError):
+    """同一租户 Session 不允许在不同用户身份之间复用。"""
+
+
 class CancellationRegistry(Protocol):
     async def cancel(self, request_id: str) -> None: ...
 

@@ -1,10 +1,15 @@
 import json
+import tempfile
 import unittest
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from seekora_agent.interfaces.http.api import create_app
+from seekora_agent.infrastructure.stores.sqlite_request_replay import (
+    SQLiteRequestReplayStore,
+)
 from test_runtime import runtime_with_one_item
 
 
@@ -77,6 +82,23 @@ class ApiTest(unittest.TestCase):
         receipt = self.client.get(f"/agent/receipts/{request_id}")
         self.assertEqual(200, receipt.status_code)
         self.assertEqual("completed", receipt.json()["status"])
+
+    def test_client_request_id_replays_identical_sse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.runtime.request_replays = SQLiteRequestReplayStore(
+                Path(directory) / "request-replays.sqlite3"
+            )
+            payload = {
+                "query": "轻薄编程笔记本",
+                "tenant_id": "demo",
+                "session_id": "api-idempotent-session",
+                "client_request_id": "api-client-request-1",
+            }
+            first = self.client.post("/agent/query", json=payload)
+            second = self.client.post("/agent/query", json=payload)
+
+            self.assertEqual(200, first.status_code)
+            self.assertEqual(first.text, second.text)
 
     def test_invalid_query_is_rejected(self):
         response = self.client.post("/agent/query", json={
@@ -195,7 +217,7 @@ class ApiTest(unittest.TestCase):
         self.assertNotEqual(
             ["untrusted_source"], created.json()["event"]["recall_sources"]
         )
-        self.assertEqual("0.17.0", created.json()["event"]["model_version"])
+        self.assertEqual("0.21.0", created.json()["event"]["model_version"])
         self.assertEqual(200, duplicate.status_code)
         self.assertTrue(duplicate.json()["duplicate"])
 

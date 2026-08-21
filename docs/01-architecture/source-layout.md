@@ -13,6 +13,8 @@ src/seekora_agent/
 │   ├── contracts.py
 │   ├── catalog.py
 │   ├── constraints.py
+│   ├── evidence.py
+│   ├── idempotency.py
 │   ├── intent.py
 │   ├── recall.py
 │   ├── tool_registry.py
@@ -30,7 +32,12 @@ src/seekora_agent/
 │   ├── search/bm25.py
 │   ├── search/semantic.py
 │   ├── stores/memory.py
+│   ├── stores/sqlite_profile.py
+│   ├── stores/sqlite_receipt.py
+│   ├── stores/sqlite_request_replay.py
+│   ├── stores/sqlite_session.py
 │   ├── tools/catalog_search.py
+│   ├── tools/item_detail.py
 │   └── tools/vector_search.py
 ├── interfaces/             # 外部输入适配层
 │   ├── cli.py
@@ -74,13 +81,20 @@ evaluation ────────────────→ domain + search a
 | `application/recall.py` | 选择召回工具、并行调用和 RRF | 具体搜索引擎 SDK |
 | `application/tool_registry.py` | 将工具注册到 ToolNode，并通过 ToolRuntime 注入可信上下文 | 具体搜索实现和模型工具选择策略 |
 | `application/constraints.py` | 硬约束与最终目录复核 | 自然语言约束猜测 |
+| `application/evidence.py` | 基于已验证事实生成确定性解释 | 自由生成目录外事实 |
+| `application/idempotency.py` | 请求指纹、执行占用和 SSE 回放端口 | SQLite 语句和 HTTP 状态转换 |
 | `application/session.py` | Session 模型和 Store/Cancellation 端口 | Redis 实现 |
 | `application/receipt.py` | Receipt 模型和持久化端口 | 数据库实现 |
 | `config/settings.py` | 环境变量校验、安全配置摘要和 Provider 开关 | Prompt、业务规则或 SDK 调用 |
 | `infrastructure/search/bm25.py` | 阶段 0 BM25 和确定性过滤 | HTTP 路由、Session 管理 |
 | `infrastructure/catalog.py` | JSONL 数据加载和质量检查 | Agent 编排 |
-| `infrastructure/stores/memory.py` | 本地 Session、Receipt、取消适配器 | 生产持久化承诺 |
+| `infrastructure/stores/memory.py` | 测试替身及本地 Cancellation、Exposure、行为聚合适配器 | 生产持久化承诺 |
+| `infrastructure/stores/sqlite_profile.py` | 单实例长期画像持久化、租户隔离和删除 | 隐式画像推断 |
+| `infrastructure/stores/sqlite_session.py` | 单实例会话持久化、TTL、消息裁剪和乐观并发控制 | 多副本分布式锁与语义摘要 |
+| `infrastructure/stores/sqlite_receipt.py` | 完整执行回执持久化、索引查询和保留期清理 | 工作流执行与审计字段生成 |
+| `infrastructure/stores/sqlite_request_replay.py` | client_request_id 原子占用与完整事件回放 | 工作流和业务结果生成 |
 | `infrastructure/tools/catalog_search.py` | 用 `@tool` 定义 BM25 工具，仅暴露任务参数 | 工具选择策略和身份参数生成 |
+| `infrastructure/tools/item_detail.py` | 批量读取通过 ACL 校验的权威目录详情 | 排序和自由文本生成 |
 | `infrastructure/intent/langchain_llm.py` | 结构化 LLM 意图解析、类型标准化和规则回退 | 召回、排序或最终约束裁决 |
 | `infrastructure/llm/openai.py` | 根据安全配置创建 LangChain `ChatOpenAI` | Prompt 与领域决策 |
 | `interfaces/http/api.py` | FastAPI、SSE 和 HTTP 校验 | 业务排序和权限推断 |

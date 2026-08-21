@@ -26,11 +26,7 @@ class ConstraintPatchOperation:
         if self.field is not None:
             payload["field"] = self.field
         if self.constraint is not None:
-            payload["constraint"] = {
-                "field": self.constraint.field,
-                "operator": self.constraint.operator,
-                "value": self.constraint.value,
-            }
+            payload["constraint"] = self.constraint.as_dict()
         return payload
 
 
@@ -57,6 +53,8 @@ class SessionContextResult:
     constraints_cleared: bool = False
     parser_version: str = "not-invoked"
     operations: tuple[dict[str, Any], ...] = ()
+    lifecycle_changes: tuple[dict[str, Any], ...] = ()
+    conflicts: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -68,4 +66,6 @@ class SessionContextResult:
             "constraints_cleared": self.constraints_cleared,
             "parser_version": self.parser_version,
             "operations": list(self.operations),
+            "lifecycle_changes": list(self.lifecycle_changes),
+            "conflicts": list(self.conflicts),
         }

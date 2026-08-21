@@ -45,7 +45,7 @@ class FastPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         request_id = events[0].request_id
         receipt = await runtime.receipts.get(request_id)
-        self.assertEqual(2, len(receipt.tool_calls))
+        self.assertEqual(3, len(receipt.tool_calls))
         self.assertEqual("price", receipt.resolved_intent["hard_constraints"][0]["field"])
         self.assertIn("CONSTRAINT_PRICE", receipt.filtered_reason_counts)
 

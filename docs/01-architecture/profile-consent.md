@@ -27,7 +27,9 @@
 
 - `src/seekora_agent/domain/profile.py`：定义授权状态和长期画像两个领域对象。
 - `src/seekora_agent/application/profile.py`：定义画像存储端口，并集中实现授权校验、偏好规范化和排序读取边界。
+- `src/seekora_agent/infrastructure/stores/sqlite_profile.py`：用 SQLite 持久化长期画像，以 `tenant_id + user_id` 为联合主键，并保证开发账户种子不会覆盖已有授权。
 - `tests/test_profile.py`：覆盖默认拒绝、显式授权、租户隔离、排序屏蔽和删除语义。
+- `tests/test_sqlite_profile.py`：覆盖进程重建后的恢复、删除和种子幂等。
 - `docs/01-architecture/profile-consent.md`：记录 Session/Profile 数据边界、授权规则与 API 契约。
 
-当前使用内存存储，进程重启后数据会丢失；生产化时可通过 `ProfileStore` 端口替换为数据库实现，而不改变应用服务规则。
+默认运行时使用 `.runtime/long-term-profiles.sqlite3`，可通过 `SEEKORA_PROFILE_DB_PATH` 修改路径。SQLite 适合本地开发和单实例部署；多实例生产环境仍可通过 `ProfileStore` 端口替换为共享数据库，而不改变应用服务规则。

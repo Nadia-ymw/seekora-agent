@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from time import monotonic
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -19,10 +20,12 @@ from .constraints import ConstraintEngine
 from .contracts import ExecutionBudget, RequestContext
 from .deep_path import ComplexityRouter, GroundedPlanner, RetrievalProbe
 from .dag import DagExecutionResult, DeepPlanExecutor
+from .evidence import EvidenceComposer
 from .intent import IntentResolver
 from .recall import RecallOrchestrator, RecallResult
 from .session_context import SessionContextResolver
 from .sufficiency import ResultSufficiencyEvaluator
+from .tool_registry import LangChainToolRegistry
 
 
 class FastPathState(TypedDict, total=False):
@@ -47,6 +50,8 @@ class FastPathState(TypedDict, total=False):
     sufficiency: SufficiencyAssessment
     replan_count: int
     terminal_decision: TerminalDecision
+    item_details: dict[str, dict[str, Any]]
+    item_detail_call: dict[str, Any]
     items: list[dict[str, Any]]
 
 
@@ -66,6 +71,8 @@ class LangChainFastPathWorkflow:
         sufficiency: ResultSufficiencyEvaluator | None = None,
         dag_executor: DeepPlanExecutor | None = None,
         session_context: SessionContextResolver | None = None,
+        item_detail_registry: LangChainToolRegistry | None = None,
+        evidence_composer: EvidenceComposer | None = None,
     ) -> None:
         self.intent_resolver = intent_resolver
         self.recall = recall
@@ -76,6 +83,8 @@ class LangChainFastPathWorkflow:
         self.sufficiency = sufficiency or ResultSufficiencyEvaluator()
         self.dag_executor = dag_executor or DeepPlanExecutor(recall)
         self.session_context = session_context or SessionContextResolver()
+        self.item_detail_registry = item_detail_registry
+        self.evidence_composer = evidence_composer or EvidenceComposer()
         builder = StateGraph(FastPathState)
         builder.add_node("resolve_intent", self._resolve_intent)
         builder.add_node("merge_session_context", self._merge_session_context)
@@ -88,6 +97,7 @@ class LangChainFastPathWorkflow:
         builder.add_node("deep_recall", self._deep_recall)
         builder.add_node("apply_constraints", self._apply_constraints)
         builder.add_node("assess_sufficiency", self._assess_sufficiency)
+        builder.add_node("enrich_result", self._enrich_result)
         builder.add_node("compose_result", self._compose_result)
         builder.add_node("compose_terminal", self._compose_terminal)
         builder.add_edge(START, "resolve_intent")
@@ -109,12 +119,13 @@ class LangChainFastPathWorkflow:
             "assess_sufficiency",
             self._next_after_sufficiency,
             {
-                "result": "compose_result",
+                "result": "enrich_result",
                 "escalate": "escalate_probe",
                 "replan": "replan",
                 "terminal": "compose_terminal",
             },
         )
+        builder.add_edge("enrich_result", "compose_result")
         builder.add_edge("compose_result", END)
         builder.add_edge("compose_terminal", END)
         self.graph = builder.compile(name="seekora_dual_path")
@@ -232,10 +243,52 @@ class LangChainFastPathWorkflow:
 
     async def _compose_result(self, state: FastPathState) -> dict[str, Any]:
         candidates = state["filter_result"].accepted[:state["top_k"]]
-        return {"items": [candidate.as_dict() for candidate in candidates]}
+        details = state.get("item_details", {})
+        return {
+            "items": [
+                self.evidence_composer.compose(candidate, details.get(candidate.item_id))
+                for candidate in candidates
+            ]
+        }
+
+    async def _enrich_result(self, state: FastPathState) -> dict[str, Any]:
+        """批量补全最终候选；详情服务临时失败时保留已验证的基础结果。"""
+        candidates = state["filter_result"].accepted[:state["top_k"]]
+        if self.item_detail_registry is None or not candidates:
+            return {"item_details": {}, "item_detail_call": {"status": "skipped"}}
+        budget = state["budget"]
+        # 详情是增强步骤，不得挤占已耗尽的请求预算或让基础结果整体失败。
+        if budget.tool_calls >= budget.max_tool_calls or budget.remaining_ms <= 0:
+            return {"item_details": {}, "item_detail_call": {"status": "skipped"}}
+        budget.consume_tool_call()
+        started_at = monotonic()
+        result = await self.item_detail_registry.invoke(
+            "item_detail",
+            {"item_ids": [candidate.item_id for candidate in candidates]},
+            self._context(state),
+        )
+        output = result.output
+        call = {
+            "tool": "item_detail",
+            "arguments": {"item_ids": [candidate.item_id for candidate in candidates]},
+            "status": result.status,
+            "latency_ms": int((monotonic() - started_at) * 1_000),
+            "source_version": str(output.get("source_version", "unknown")),
+            "error_code": result.error_code,
+        }
+        if result.status != "ok" or output.get("status") != "ok":
+            return {"item_details": {}, "item_detail_call": call}
+        details = {
+            str(item["item_id"]): dict(item)
+            for item in output.get("items", [])
+            if isinstance(item, dict) and "item_id" in item
+        }
+        return {"item_details": details, "item_detail_call": call}
 
     async def _compose_terminal(self, state: FastPathState) -> dict[str, Any]:
-        decision = self.sufficiency.terminal_decision(state["sufficiency"])
+        decision = self.sufficiency.terminal_decision(
+            state["sufficiency"], state["filter_result"].relaxation_suggestions
+        )
         return {"items": [], "terminal_decision": decision}
 
     async def astream(self, state: FastPathState) -> AsyncIterator[dict[str, Any]]:

@@ -48,7 +48,7 @@ class ResolvedIntent:
             "domain": self.domain,
             "retrieval_query": self.retrieval_query,
             "hard_constraints": [
-                {"field": rule.field, "operator": rule.operator, "value": rule.value}
+                rule.as_dict()
                 for rule in self.hard_constraints
             ],
             "soft_preferences": list(self.soft_preferences),
@@ -93,3 +93,5 @@ class VerifiedCandidate:
 class ConstraintFilterResult:
     accepted: tuple[VerifiedCandidate, ...]
     filtered_reason_counts: dict[str, int] = field(default_factory=dict)
+    conflicts: tuple[dict[str, Any], ...] = ()
+    relaxation_suggestions: tuple[dict[str, Any], ...] = ()

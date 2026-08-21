@@ -2,7 +2,7 @@
 
 ## 环境要求
 
-- Conda 环境：`seekora-agent`
+- Conda 环境：`nanobot`
 - Python 3.11+
 - PowerShell 或兼容终端
 
@@ -10,7 +10,7 @@
 
 ```powershell
 conda env create -f environment.yml
-conda activate seekora-agent
+conda activate nanobot
 python -m pip install -e ".[dev]"
 ```
 
@@ -24,7 +24,7 @@ python -m unittest discover -s tests -v
 不激活环境时：
 
 ```powershell
-conda run -n seekora-agent python -m unittest discover -s tests -v
+conda run -n nanobot python -m unittest discover -s tests -v
 ```
 
 ## 离线命令
@@ -59,7 +59,7 @@ python -m seekora_agent.interfaces.cli prepare-kuaisearch `
 ## 启动 API
 
 ```powershell
-conda run -n seekora-agent python -m uvicorn seekora_agent.bootstrap:app --host 127.0.0.1 --port 8000
+conda run -n nanobot python -m uvicorn seekora_agent.bootstrap:app --host 127.0.0.1 --port 8000
 ```
 
 默认目录为 `data/sample/items.jsonl`。替换目录：
@@ -72,7 +72,13 @@ $env:SEEKORA_CATALOG_PATH = "C:\data\items.jsonl"
 
 ```powershell
 $env:SEEKORA_BEHAVIOR_QUEUE_PATH = "D:\seekora-data\behavior-events.sqlite3"
+$env:SEEKORA_PROFILE_DB_PATH = "D:\seekora-data\long-term-profiles.sqlite3"
+$env:SEEKORA_REQUEST_REPLAY_DB_PATH = "D:\seekora-data\request-replays.sqlite3"
+$env:SEEKORA_SESSION_DB_PATH = "D:\seekora-data\sessions.sqlite3"
+$env:SEEKORA_RECEIPT_DB_PATH = "D:\seekora-data\receipts.sqlite3"
 ```
+
+Session 默认保留 24 小时并最多保存 40 条消息，Receipt 默认保留 30 天。可分别用 `SEEKORA_SESSION_TTL_SECONDS`、`SEEKORA_SESSION_MAX_MESSAGES` 和 `SEEKORA_RECEIPT_RETENTION_SECONDS` 调整。
 
 接口文档地址为 `http://127.0.0.1:8000/docs`。
 Web 测试台地址为 `http://127.0.0.1:8000/`。

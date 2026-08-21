@@ -6,6 +6,7 @@ from seekora_agent.application.constraints import ConstraintEngine
 from seekora_agent.application.recall import RecallOrchestrator
 from seekora_agent.application.runtime import AgentRuntime
 from seekora_agent.application.session_context import SessionContextResolver
+from seekora_agent.application.tool_registry import LangChainToolRegistry
 from seekora_agent.application.profile import ProfileService
 from seekora_agent.application.exposure import ExposureService
 from seekora_agent.application.workflow import LangChainFastPathWorkflow
@@ -29,9 +30,10 @@ from seekora_agent.infrastructure.stores.memory import (
 )
 from seekora_agent.infrastructure.tools.catalog_search import build_catalog_search_tool
 from seekora_agent.infrastructure.tools.vector_search import build_vector_search_tool
+from seekora_agent.infrastructure.tools.item_detail import build_item_detail_tool
 
 
-def runtime_with_one_item() -> AgentRuntime:
+def runtime_with_one_item(request_replays=None, sessions=None, receipts=None) -> AgentRuntime:
     item = Item.from_dict({
         "item_id": "lap-1",
         "tenant_id": "demo",
@@ -59,22 +61,27 @@ def runtime_with_one_item() -> AgentRuntime:
         exposure_service,
         InMemoryBehaviorEventQueue(),
     )
+    catalog = InMemoryCatalogRepository([item])
     return AgentRuntime(
         workflow=LangChainFastPathWorkflow(
             intent_resolver=RuleBasedIntentResolver(),
             recall=RecallOrchestrator(tools),
-            constraint_engine=ConstraintEngine(InMemoryCatalogRepository([item])),
+            constraint_engine=ConstraintEngine(catalog),
             session_context=SessionContextResolver(
                 RuleBasedSessionContextPatchResolver()
             ),
+            item_detail_registry=LangChainToolRegistry([
+                build_item_detail_tool(catalog, "test-catalog-v1")
+            ]),
         ),
-        sessions=InMemorySessionStore(),
-        receipts=InMemoryReceiptStore(),
+        sessions=sessions or InMemorySessionStore(),
+        receipts=receipts or InMemoryReceiptStore(),
         cancellations=InMemoryCancellationRegistry(),
         profiles=profile_service,
         behaviors=behavior_service,
         exposures=exposure_service,
         test_account=test_account,
+        request_replays=request_replays,
     )
 
 
@@ -107,6 +114,15 @@ class RuntimeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("completed", receipt.status)
         self.assertEqual(["lap-1"], receipt.candidate_ids)
         self.assertEqual("catalog_search", receipt.tool_calls[0].tool)
+        self.assertEqual("item_detail", receipt.tool_calls[-1].tool)
+
+        result = next(event for event in events if event.event == "result")
+        self.assertEqual("适合软件开发", result.data["items"][0]["description"])
+        self.assertEqual("laptop", result.data["items"][0]["category"])
+        self.assertEqual(
+            ["catalog://item/lap-1"],
+            result.data["items"][0]["explanation"]["sources"],
+        )
 
         session = await runtime.sessions.get("demo", "session-1")
         self.assertEqual(2, len(session.messages))

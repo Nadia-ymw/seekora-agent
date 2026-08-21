@@ -50,7 +50,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("primary", receipt.plan["steps"][0]["purpose"])
         self.assertEqual("completed", receipt.dag_executions[0]["stop_reason"])
         # Two source calls for the probe and two for the executable plan query.
-        self.assertEqual(4, len(receipt.tool_calls))
+        self.assertEqual(5, len(receipt.tool_calls))
 
     async def test_fast_path_does_not_pay_probe_cost(self):
         runtime = build_runtime()
@@ -64,7 +64,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual("fast", receipt.route)
         self.assertNotIn("probe.completed", names)
-        self.assertEqual(2, len(receipt.tool_calls))
+        self.assertEqual(3, len(receipt.tool_calls))
 
     async def test_non_laptop_category_uses_deep_path_and_returns_catalog_item(self):
         runtime = build_runtime()
@@ -112,6 +112,13 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("response.refused", names)
         self.assertEqual(1, receipt.replan_count)
         self.assertEqual("refused", receipt.status)
+        self.assertEqual(1, len(receipt.relaxation_suggestions))
+        self.assertTrue(receipt.relaxation_suggestions[0]["requires_confirmation"])
+        refused = next(event for event in events if event.event == "response.refused")
+        self.assertEqual(
+            receipt.relaxation_suggestions,
+            refused.data["relaxation_suggestions"],
+        )
         self.assertLessEqual(len(receipt.tool_calls), 8)
 
     async def test_unsupported_ambiguous_query_requests_clarification(self):

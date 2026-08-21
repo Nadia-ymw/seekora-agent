@@ -158,10 +158,10 @@ Receipt 新增：
 
 - 规则解析不等同于完整自然语言理解；LLM 解析也必须通过确定性约束与目录复核；
 - TF-IDF 余弦只是语义召回的内存替身；
-- 暂无 LTR、Cross-Encoder 和多样性排序；行为召回已有授权安全基线；
+- 暂无 Cross-Encoder/在线轻量模型重排和多样性排序；行为召回已有授权安全基线；
 - Evidence 当前主要来自硬约束字段，尚未生成自然语言解释；
 - 多轮约束已支持结构化 AI Patch、确定性归并和规则降级；
 - Deep Path、Probe 和一次 Replan 已实现；
 - 正式性能仍需在真实 OpenSearch/Embedding/Catalog 上测试。
 
-下一增量优先实现 Item Detail 与证据解释链路；LTR 按当前开发条件暂缓。
+Item Detail 与证据解释链路已实现；后续通过统一 Reranker 接口接入开源 Cross-Encoder 或在线轻量模型服务，不进行 LTR 训练。

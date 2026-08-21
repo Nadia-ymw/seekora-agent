@@ -36,6 +36,8 @@ class RecommendationReceipt:
     exposure_id: str | None = None
     resolved_intent: dict[str, Any] = field(default_factory=dict)
     session_context: dict[str, Any] = field(default_factory=dict)
+    constraint_lifecycle: dict[str, Any] = field(default_factory=dict)
+    relaxation_suggestions: list[dict[str, Any]] = field(default_factory=list)
     route_decision: dict[str, Any] = field(default_factory=dict)
     probe_summary: dict[str, Any] = field(default_factory=dict)
     plan: dict[str, Any] = field(default_factory=dict)
@@ -46,8 +48,8 @@ class RecommendationReceipt:
     filtered_reason_counts: dict[str, int] = field(default_factory=dict)
     error_code: str | None = None
     config_versions: dict[str, str] = field(default_factory=lambda: {
-        "agent": "0.17.0",
-        "workflow": "langgraph-dual-path-v6",
+        "agent": "0.21.0",
+        "workflow": "langgraph-dual-path-v8",
         "prompt": "none",
         "tool_policy": "langchain-toolnode-v2",
         "ranker": "rrf-v1",

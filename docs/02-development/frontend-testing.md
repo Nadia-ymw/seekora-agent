@@ -76,7 +76,7 @@ conda run -n seekora-agent python -m uvicorn seekora_agent.bootstrap:app --host 
 ## 5. 当前边界
 
 - 页面使用固定演示租户 `demo` 和公开权限；
-- Session 仅保存在当前浏览器和后端内存中，服务重启后后端历史会丢失；
+- 浏览器只保存当前 `session_id`，后端 Session 持久化到 SQLite；超过 TTL 的会话会被清理；
 - 当前结果是结构化推荐卡片，不是模型生成的长篇自然语言回答；
 - 样例目录规模较小，只适合验证调用链路；
 - API Key 只由后端 `.env` 读取，绝不会发送给浏览器。

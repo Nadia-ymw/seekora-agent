@@ -9,7 +9,7 @@ SessionContextPatchResolver
           ↓
 ConstraintPatch(new_task/follow_up, set/add/remove/clear)
           ↓
-SessionContextResolver（白名单校验、类型标准化、确定性归并）
+SessionContextResolver（白名单校验、类型标准化、生命周期归并）
           ↓
 最终 ResolvedIntent
 ```
@@ -30,7 +30,9 @@ AI 可以理解“预算放宽一点”“之前的价格不要限制”等表�
 - `clear`：清空全部用户硬约束；
 - `new_task`：不读取上一轮约束，防止跨任务污染。
 
-合并成功时先发送 `session.context_applied`，随后发送最终的 `intent.resolved`。Receipt 的 `session_context` 保存解析器版本、Patch 操作、来源请求以及继承、替换和删除字段。
+合并成功时发送 `session.context_applied`；存在状态变化或冲突时发送 `constraints.lifecycle`，随后发送最终的 `intent.resolved`。Receipt 的 `session_context` 保存解析器版本、Patch 操作、来源请求以及继承、替换和删除字段，`constraint_lifecycle` 保存逐条状态变化与冲突。
+
+每条约束都携带 `scope/source/source_turn/confidence/status/priority/expires_at`。`contextual` 在下一轮过期，`session` 在同一任务中继承，`identity` 不允许被普通 `remove/clear` Patch 删除。跨类目追问会挂起不适用的类目专属字段，返回原类目时恢复；显式 `new_task` 仍完全隔离上一任务。完整规则见 [Constraint 生命周期与最小放宽](constraint-lifecycle.md)。
 
 ## 安全边界与限制
 
@@ -38,7 +40,8 @@ AI 可以理解“预算放宽一点”“之前的价格不要限制”等表�
 - 临时条件不会写入长期 Profile；
 - Reducer 再次检查字段、操作符、数值类型和 `in` 列表，不信任模型输出；
 - 模型不能直接修改 Session，也不能操作租户和权限字段；
-- 当前只保存最近一次 Session Intent，尚未实现 TTL、历史压缩和持久化；
+- 无结果或冲突时只返回 `requires_confirmation=true` 的最小放宽建议，未经用户新一轮确认不会修改约束；
+- 当前通过 SQLite 保存最近一次 Session Intent 和有限消息历史，支持 TTL、最大消息数裁剪与重启恢复；尚未实现语义摘要压缩；
 - OpenAI 模式的多轮请求会额外调用一次结构化模型，需要纳入延迟和费用观测。
 
 ## 新增文件职责

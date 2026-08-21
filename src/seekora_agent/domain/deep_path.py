@@ -118,6 +118,7 @@ class TerminalDecision:
     reason: str
     message: str
     questions: tuple[str, ...] = ()
+    relaxation_suggestions: tuple[dict[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -125,4 +126,5 @@ class TerminalDecision:
             "reason": self.reason,
             "message": self.message,
             "questions": list(self.questions),
+            "relaxation_suggestions": list(self.relaxation_suggestions),
         }

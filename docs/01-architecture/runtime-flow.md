@@ -5,6 +5,7 @@
 ```text
 POST /agent/query
 → interfaces/http/api.py：Pydantic 校验、构造 AgentQuery、建立 SSE
+→ application/runtime.py：按 client_request_id 占用执行权或回放已完成 SSE
 → application/runtime.py：建立 request_id、预算、Session、Receipt
 → application/workflow.py：启动编译后的 LangGraph
 → resolve_intent 节点：结构化意图与硬约束
@@ -17,7 +18,8 @@ POST /agent/query
 → recall 节点：RRF 融合
 → apply_constraints 节点：硬约束与 Catalog 最终复核
 → assess_sufficiency 节点：判断返回、一次 Replan、澄清或拒答
-→ compose_result 节点：生成结构化结果
+→ enrich_result 节点：批量 Item Detail 与 ACL 复核
+→ compose_result 节点：基于目录证据生成结构化结果和解释
 → application/runtime.py：消费图更新，记录 Session 和 Receipt
 → interfaces/http/api.py：输出 result 与 done 事件
 ```
@@ -26,7 +28,7 @@ POST /agent/query
 
 ```text
 request.accepted → intent.resolved → routing.completed → recall.started → recall.completed
-→ constraints.applied → result → done
+→ constraints.applied → item_details.completed → result → done
 ```
 
 发生多轮合并时，`intent.resolved` 前会增加 `session.context_applied`，其中只记录结构化 Patch 和合并摘要，不包含模型思维链。
@@ -41,4 +43,4 @@ Deep Path 会增加 `probe.completed`、`plan.created`、`dag.completed` 和 `su
 
 ## 当前适配器
 
-Session、Receipt 和 Cancellation 使用内存实现，只适合单进程开发。生产部署需在 `infrastructure/stores` 添加 Redis/PostgreSQL 适配器，并在 `bootstrap.py` 替换装配。
+Session、Receipt、长期 Profile、行为事件队列和请求回放默认使用 SQLite；Cancellation、Exposure 和行为聚合仍使用内存实现。当前组合适合本地及单实例开发，生产多副本部署需在 `infrastructure/stores` 添加共享数据库或缓存适配器，并在 `bootstrap.py` 替换装配。

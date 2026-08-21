@@ -5,6 +5,7 @@
 ## 00 概览
 
 - [实施任务规划](00-overview/implementation-plan.md)：阶段目标、数据获取、里程碑和发布门禁。
+- [技术路线实现状态与后续开发规划](00-overview/technical-route-status-and-roadmap.md)：逐项对照技术路线，区分代码完成度、门禁状态和后续增量。
 
 ## 01 架构
 
@@ -15,10 +16,14 @@
 - [Deep Path DAG 执行设计](01-architecture/dag-execution.md)：节点依赖、并发限制、停止条件、故障降级和执行凭据。
 - [Session Intent、Profile 与 Consent](01-architecture/profile-consent.md)：短期意图、长期画像、显式授权和隐私边界。
 - [多轮 Session 约束上下文](01-architecture/session-context.md)：约束修改、追加、删除、清空与新任务隔离。
+- [Constraint 生命周期与最小放宽](01-architecture/constraint-lifecycle.md)：约束元数据、继承、过期、挂起、冲突与确认式放宽。
+- [SQLite Session 与 Receipt](01-architecture/sqlite-session-receipt.md)：短期状态、执行回执、TTL、裁剪与并发版本控制。
 - [行为反馈与授权召回](01-architecture/behavior-feedback.md)：反馈事件、幂等写入、双重授权和行为召回边界。
 - [服务端曝光清单与反馈归因](01-architecture/exposure-validation.md)：曝光生成、身份关联、服务端归因和删除传播。
 - [行为事件持久化队列](01-architecture/event-pipeline.md)：SQLite 队列、迟到策略、机器人过滤和事件重放。
-- [曝光行为训练样本与 LTR 特征契约](01-architecture/ltr-training.md)：分级标签、成熟窗口、防泄漏特征和时间切分。
+- [Item Detail 与证据解释链路](01-architecture/item-detail-evidence.md)：详情补全、ACL 复核、证据组合和降级。
+- [请求幂等与 SSE 回放](01-architecture/request-idempotency.md)：请求指纹、执行占用、冲突保护和跨重启回放。
+- [曝光行为排序评测样本与特征契约](01-architecture/ltr-training.md)：分级标签、成熟窗口、防泄漏特征和时间切分；不进行 LTR 模型训练。
 - [LangChain 迁移说明](01-architecture/langchain-migration.md)：StateGraph、`@tool`、ToolNode、ToolRuntime 和扩展方式。
 
 ## 02 开发
