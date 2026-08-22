@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Protocol
 
-from ..domain.models import GoldenQuery
-from ..infrastructure.search.bm25 import BM25Baseline
+from ..domain.models import GoldenQuery, SearchQuery, SearchResult
+
+
+class RankedSearch(Protocol):
+    """离线评测只依赖排序搜索契约，不绑定 BM25 具体实现。"""
+
+    def search(self, query: SearchQuery, top_k: int = 10) -> list[SearchResult]: ...
 
 
 @dataclass(frozen=True)
@@ -30,7 +36,7 @@ def _dcg(grades: list[int]) -> float:
     return sum((2**grade - 1) / math.log2(index + 2) for index, grade in enumerate(grades))
 
 
-def evaluate(baseline: BM25Baseline, queries: list[GoldenQuery], k: int = 10) -> EvaluationReport:
+def evaluate(baseline: RankedSearch, queries: list[GoldenQuery], k: int = 10) -> EvaluationReport:
     if not queries:
         raise ValueError("golden query set must not be empty")
     recalls: list[float] = []

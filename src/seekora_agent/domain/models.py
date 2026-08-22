@@ -15,6 +15,18 @@ ConstraintSource = Literal["query", "session", "profile", "system"]
 # 约束的状态，控制其是否生效（active）、被临时挂起（suspended）或已过期（expired）
 ConstraintStatus = Literal["active", "suspended", "expired"]
 
+# 商品检索文档只纳入稳定且有业务语义的字段。顺序同时用于 BM25、TF-IDF 和
+# Embedding 内容哈希，不能依赖 attributes 的插入顺序或混入内部 ID、合成标记。
+SEARCHABLE_ATTRIBUTE_FIELDS = (
+    "brand",
+    "seller",
+    "category_level1_name",
+    "category_level2_name",
+    "category_level3_name",
+    "product_type",
+    "use_cases",
+)
+
 # 约束与查询文本分离，支持结构化过滤 + 全文检索的组合查询
 @dataclass(frozen=True)
 class Constraint:
@@ -129,9 +141,15 @@ class Item:
         )
 
     def searchable_text(self) -> str:
-        values = [self.title, self.description, self.category]
-        values.extend(str(value) for value in self.attributes.values())
-        return " ".join(values)
+        values: list[str] = [self.title]
+        for field_name in SEARCHABLE_ATTRIBUTE_FIELDS:
+            value = self.attributes.get(field_name)
+            if isinstance(value, (list, tuple, set)):
+                values.extend(str(item) for item in value if str(item).strip())
+            elif value is not None and str(value).strip():
+                values.append(str(value))
+        values.extend((self.category, self.description))
+        return " ".join(value.strip() for value in values if value.strip())
 
     def field_value(self, name: str) -> Any:
         if hasattr(self, name):

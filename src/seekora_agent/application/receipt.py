@@ -19,6 +19,7 @@ class ToolCallReceipt:
     latency_ms: int
     source_version: str
     error_code: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -45,11 +46,12 @@ class RecommendationReceipt:
     replan_count: int = 0
     terminal_decision: dict[str, Any] = field(default_factory=dict)
     dag_executions: list[dict[str, Any]] = field(default_factory=list)
+    rerank_executions: list[dict[str, Any]] = field(default_factory=list)
     filtered_reason_counts: dict[str, int] = field(default_factory=dict)
     error_code: str | None = None
     config_versions: dict[str, str] = field(default_factory=lambda: {
-        "agent": "0.21.0",
-        "workflow": "langgraph-dual-path-v8",
+        "agent": "0.22.0",
+        "workflow": "langgraph-dual-path-v9",
         "prompt": "none",
         "tool_policy": "langchain-toolnode-v2",
         "ranker": "rrf-v1",

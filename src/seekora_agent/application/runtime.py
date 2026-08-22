@@ -236,10 +236,18 @@ class AgentRuntime:
                                 "status": call.status,
                                 "latency_ms": call.latency_ms,
                                 "source_version": call.source_version,
+                                "metadata": call.metadata or {},
                             }
                             for call in recall_result.calls
                         },
                     })
+                elif node_name == "rerank":
+                    rerank = payload["rerank_result"]
+                    audit = rerank.as_dict()
+                    receipt.rerank_executions.append(audit)
+                    # Off 模式不增加 SSE 噪声；Challenger 和降级都必须对外可审计。
+                    if rerank.status != "skipped":
+                        yield AgentEvent("rerank.completed", request_id, audit)
                 elif node_name == "apply_constraints": # 约束过滤
                     filtered = payload["filter_result"]
                     receipt.filtered_reason_counts = filtered.filtered_reason_counts
@@ -356,4 +364,5 @@ class AgentRuntime:
                 latency_ms=call.latency_ms,
                 source_version=call.source_version,
                 error_code=call.error_code,
+                metadata=call.metadata or {},
             ))

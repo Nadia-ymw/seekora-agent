@@ -68,6 +68,7 @@ conda run -n seekora-agent python -m uvicorn seekora_agent.bootstrap:app --host 
 | `request.accepted` | 显示请求已接收 |
 | `intent.resolved` | 展示解析器、意图、置信度和硬约束 |
 | `recall.started/completed` | 更新并行召回状态和候选数量 |
+| `rerank.completed` | Challenger 启用时记录模型版本、耗时、分数或降级原因 |
 | `constraints.applied` | 展示通过目录复核的候选数量 |
 | `result` | 渲染推荐卡片、RRF 分数和召回原因 |
 | `error/cancelled` | 显示错误或取消原因 |

@@ -4,6 +4,8 @@
 
 ## 00 概览
 
+- [三层模型搜索推荐 Agent 重构主控执行规划](00-overview/three-layer-agent-refactoring-execution-plan.md)：当前生效的重构阶段、核心契约、过滤式 HNSW、模型职责、质量门禁、回滚和防漂移规则。
+- [单实例本地 MVP 后续开发规划](00-overview/local-mvp-development-plan.md)：M1/M2 历史基线、千问 Embedding 选型和原 MVP 范围；原 M3/M4 排期已由重构主控规划取代。
 - [实施任务规划](00-overview/implementation-plan.md)：阶段目标、数据获取、里程碑和发布门禁。
 - [技术路线实现状态与后续开发规划](00-overview/technical-route-status-and-roadmap.md)：逐项对照技术路线，区分代码完成度、门禁状态和后续增量。
 
@@ -17,6 +19,7 @@
 - [Session Intent、Profile 与 Consent](01-architecture/profile-consent.md)：短期意图、长期画像、显式授权和隐私边界。
 - [多轮 Session 约束上下文](01-architecture/session-context.md)：约束修改、追加、删除、清空与新任务隔离。
 - [Constraint 生命周期与最小放宽](01-architecture/constraint-lifecycle.md)：约束元数据、继承、过期、挂起、冲突与确认式放宽。
+- [Embedding 索引与语义复核](01-architecture/semantic-retrieval.md)：向量端口、版本化索引、Embedding/Cross-Encoder Challenger 和降级边界。
 - [SQLite Session 与 Receipt](01-architecture/sqlite-session-receipt.md)：短期状态、执行回执、TTL、裁剪与并发版本控制。
 - [行为反馈与授权召回](01-architecture/behavior-feedback.md)：反馈事件、幂等写入、双重授权和行为召回边界。
 - [服务端曝光清单与反馈归因](01-architecture/exposure-validation.md)：曝光生成、身份关联、服务端归因和删除传播。
@@ -32,6 +35,7 @@
 - [本地测试账户](02-development/demo-account.md)：预置测试身份、初始 Profile、调用方式和安全边界。
 - [KuaiSearch-Lite 电子产品数据处理](02-development/kuaisearch-data.md)：外部数据目录、流式转换、真实统计和字段映射。
 - [LLM 配置与新增文件说明](02-development/llm-configuration.md)：API Key、Provider 选择、降级路径和本增量文件职责。
+- [本地语义模型配置](02-development/semantic-models.md)：可选依赖、向量索引构建和 Challenger 启用方式。
 - [Web 测试台使用说明](02-development/frontend-testing.md)：聊天页面、SSE 事件、模型调用识别和文件职责。
 - [Deep Path 测试指南](02-development/deep-path-testing.md)：Fast/Deep 路由、SSE、Receipt 和复杂约束验收用例。
 - [编码与扩展规范](02-development/coding-standards.md)：新增模块、工具和基础设施适配器的约定。
@@ -39,6 +43,9 @@
 ## 03 测试
 
 - [测试策略](03-testing/test-strategy.md)：测试分层、当前覆盖和发布前检查。
+- [本地并行召回与 SQLite 向量索引性能报告](03-testing/local-recall-performance-report.md)：5 万商品暖态微基准、并行关键路径、旧 JSON 方案提速原因和后续性能门禁。
+- [M3 搜索推荐检索策略与测试说明报告](03-testing/m3-search-retrieval-development-summary.md)：完整检索链路、Active/Challenger/降级策略、测试过程、通过与失败指标及后续建议。
+- [M3 本地混合召回质量门禁报告](03-testing/m3-recall-quality-report.md)：固定查询集、BM25+TF-IDF 与 BM25+Qwen 对照以及加权 RRF 实验结果。
 
 ## 文档维护规则
 

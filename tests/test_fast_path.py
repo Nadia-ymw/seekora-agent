@@ -23,8 +23,45 @@ class IntentResolverTest(unittest.IsolatedAsyncioTestCase):
 
 
 class FastPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
+    async def test_source_weight_changes_rrf_order_without_dropping_qwen(self):
+        @tool("catalog", response_format="content_and_artifact")
+        async def catalog(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
+            """Return a keyword candidate."""
+            del query, runtime, top_k
+            return "keyword", {"status": "ok", "source_version": "bm25", "data": {
+                "candidates": [{"item_id": "keyword", "title": "关键词", "score": 1.0}]
+            }}
+
+        @tool("vector", response_format="content_and_artifact")
+        async def vector(
+            query: str, runtime: ToolRuntime[RequestContext], top_k: int = 10
+        ) -> tuple[str, dict]:
+            """Return a formal Qwen candidate."""
+            del query, runtime, top_k
+            return "semantic", {"status": "ok", "source_version": "qwen", "data": {
+                "candidates": [{
+                    "item_id": "semantic", "title": "语义", "score": 1.0, "source": "qwen"
+                }]
+            }, "metadata": {"retrieval_source": "qwen"}}
+
+        result = await RecallOrchestrator(
+            [catalog, vector],
+            source_tools=("catalog", "vector"),
+            source_weights={"qwen": 0.5},
+        ).recall(
+            "query",
+            2,
+            RequestContext("request", "demo", None, ("public",)),
+            ExecutionBudget(),
+        )
+        self.assertEqual(["keyword", "semantic"], [item.item_id for item in result.candidates])
+        self.assertIn("qwen", result.candidates[1].source_scores)
+        self.assertEqual(0.5, result.calls[1].metadata["rrf_weight"])
+
     async def test_dual_recall_rrf_constraints_and_receipt(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="推荐8000元以内适合编程的轻薄笔记本",
             tenant_id="demo",

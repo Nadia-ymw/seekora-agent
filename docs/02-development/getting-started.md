@@ -32,15 +32,17 @@ conda run -n nanobot python -m unittest discover -s tests -v
 安装后可以使用统一脚本：
 
 ```powershell
-seekora-agent quality --catalog data/sample/items.jsonl
-seekora-agent search --catalog data/sample/items.jsonl --query "适合编程的轻薄本"
-seekora-agent evaluate --catalog data/sample/items.jsonl --golden data/golden/queries.jsonl
+seekora-agent quality
+seekora-agent search --query "适合编程的轻薄本"
+seekora-agent evaluate --golden data/golden/queries.jsonl
 ```
+
+构建版本化 Embedding 索引和启用语义 Challenger 的命令见[本地语义模型配置](semantic-models.md)。默认开发和测试不安装或加载模型权重。
 
 也可以直接运行模块：
 
 ```powershell
-python -m seekora_agent.interfaces.cli quality --catalog data/sample/items.jsonl
+python -m seekora_agent.interfaces.cli quality
 ```
 
 处理本地下载的 KuaiSearch-Lite 电子产品数据：
@@ -62,11 +64,15 @@ python -m seekora_agent.interfaces.cli prepare-kuaisearch `
 conda run -n nanobot python -m uvicorn seekora_agent.bootstrap:app --host 127.0.0.1 --port 8000
 ```
 
-默认目录为 `data/sample/items.jsonl`。替换目录：
+默认目录为 `data/processed/kuaisearch-electronics/items.jsonl`。路径不存在、
+文件为空或包含重复商品 ID 时启动会明确失败，不会静默回退到样例目录。
+如需显式使用其他目录：
 
 ```powershell
 $env:SEEKORA_CATALOG_PATH = "C:\data\items.jsonl"
 ```
+
+单元测试或最小演示可显式传入 `data/sample/items.jsonl`。
 
 行为事件队列默认保存在 `.runtime/behavior-events.sqlite3`。如需把运行数据放到独立目录：
 

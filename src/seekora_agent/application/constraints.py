@@ -176,6 +176,8 @@ class ConstraintEngine:
                 source_scores=candidate.source_scores,
                 reasons=(*candidate.reasons, "catalog_validated", "hard_constraints_passed"),
                 evidence=evidence,
+                rerank_score=candidate.rerank_score,
+                rerank_mode=candidate.rerank_mode,
             ))
         suggestions = ()
         if not accepted:

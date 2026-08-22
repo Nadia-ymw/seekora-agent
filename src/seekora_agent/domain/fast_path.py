@@ -66,6 +66,9 @@ class FusedCandidate:
     score: float
     source_scores: dict[str, float]
     reasons: tuple[str, ...]
+    # Challenger 分数独立保存，不能冒充召回来源或改变 RRF 充分性判断。
+    rerank_score: float | None = None
+    rerank_mode: str | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,8 @@ class VerifiedCandidate:
     source_scores: dict[str, float]
     reasons: tuple[str, ...]
     evidence: tuple[dict[str, Any], ...] = ()
+    rerank_score: float | None = None
+    rerank_mode: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +91,8 @@ class VerifiedCandidate:
             "reasons": list(self.reasons),
             "constraint_pass": True,
             "evidence": list(self.evidence),
+            "rerank_score": self.rerank_score,
+            "rerank_mode": self.rerank_mode,
         }
 
 

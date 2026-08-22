@@ -23,6 +23,7 @@ from .dag import DagExecutionResult, DeepPlanExecutor
 from .evidence import EvidenceComposer
 from .intent import IntentResolver
 from .recall import RecallOrchestrator, RecallResult
+from .reranking import RerankOrchestrator, RerankResult
 from .session_context import SessionContextResolver
 from .sufficiency import ResultSufficiencyEvaluator
 from .tool_registry import LangChainToolRegistry
@@ -45,6 +46,7 @@ class FastPathState(TypedDict, total=False):
     probe_result: RecallResult
     plan: DeepPlan
     recall_result: RecallResult
+    rerank_result: RerankResult
     dag_execution: DagExecutionResult
     filter_result: ConstraintFilterResult
     sufficiency: SufficiencyAssessment
@@ -73,6 +75,7 @@ class LangChainFastPathWorkflow:
         session_context: SessionContextResolver | None = None,
         item_detail_registry: LangChainToolRegistry | None = None,
         evidence_composer: EvidenceComposer | None = None,
+        reranker: RerankOrchestrator | None = None,
     ) -> None:
         self.intent_resolver = intent_resolver
         self.recall = recall
@@ -85,6 +88,9 @@ class LangChainFastPathWorkflow:
         self.session_context = session_context or SessionContextResolver()
         self.item_detail_registry = item_detail_registry
         self.evidence_composer = evidence_composer or EvidenceComposer()
+        self.reranker = reranker or RerankOrchestrator(
+            constraint_engine.catalog, mode="off"
+        )
         builder = StateGraph(FastPathState)
         builder.add_node("resolve_intent", self._resolve_intent)
         builder.add_node("merge_session_context", self._merge_session_context)
@@ -95,6 +101,7 @@ class LangChainFastPathWorkflow:
         builder.add_node("replan", self._replan)
         builder.add_node("recall", self._recall)
         builder.add_node("deep_recall", self._deep_recall)
+        builder.add_node("rerank", self._rerank)
         builder.add_node("apply_constraints", self._apply_constraints)
         builder.add_node("assess_sufficiency", self._assess_sufficiency)
         builder.add_node("enrich_result", self._enrich_result)
@@ -112,8 +119,9 @@ class LangChainFastPathWorkflow:
         builder.add_edge("escalate_probe", "plan")
         builder.add_edge("plan", "deep_recall")
         builder.add_edge("replan", "deep_recall")
-        builder.add_edge("recall", "apply_constraints")
-        builder.add_edge("deep_recall", "apply_constraints")
+        builder.add_edge("recall", "rerank")
+        builder.add_edge("deep_recall", "rerank")
+        builder.add_edge("rerank", "apply_constraints")
         builder.add_edge("apply_constraints", "assess_sufficiency")
         builder.add_conditional_edges(
             "assess_sufficiency",
@@ -212,6 +220,16 @@ class LangChainFastPathWorkflow:
             self._context(state),
         )
         return {"filter_result": result}
+
+    async def _rerank(self, state: FastPathState) -> dict[str, Any]:
+        """对融合候选执行可选语义复核；Challenger 模式保持原始排序。"""
+        result = await self.reranker.rerank(
+            state["intent"].retrieval_query,
+            state["recall_result"].candidates,
+        )
+        # 后续约束引擎只读取 rerank 后的候选副本，仍会再次校验目录、ACL 和硬条件。
+        recall_result = RecallResult(result.candidates, state["recall_result"].calls)
+        return {"rerank_result": result, "recall_result": recall_result}
 
     async def _assess_sufficiency(self, state: FastPathState) -> dict[str, Any]:
         plan = state.get("plan")

@@ -281,6 +281,11 @@ function dispatchAgentEvent(ui, name, payload) {
   } else if (name === "recall.completed") {
     advanceSteps(ui, "constraints");
     ui.summary.textContent = `召回 ${data.candidate_count || 0} 个候选，正在执行硬约束与目录复核。`;
+  } else if (name === "rerank.completed") {
+    // Challenger 只展示审计状态；前端不根据模型分数自行改变服务端候选顺序。
+    ui.summary.textContent = data.status === "degraded"
+      ? `语义复核已降级为 RRF（${data.error_code || "模型不可用"}），正在继续目录复核。`
+      : `语义 Challenger 已复核 ${(data.scores || []).length} 个候选，RRF 顺序保持不变。`;
   } else if (name === "constraints.applied") {
     advanceSteps(ui, "result");
     ui.summary.textContent = `${data.accepted_count || 0} 个候选通过约束，正在组织结果。`;

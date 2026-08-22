@@ -17,6 +17,8 @@ src/seekora_agent/
 │   ├── idempotency.py
 │   ├── intent.py
 │   ├── recall.py
+│   ├── reranking.py
+│   ├── semantic.py
 │   ├── tool_registry.py
 │   ├── receipt.py
 │   ├── runtime.py
@@ -29,8 +31,11 @@ src/seekora_agent/
 │   │   ├── rule_based.py
 │   │   └── langchain_llm.py
 │   ├── llm/openai.py
+│   ├── embeddings/sentence_transformer.py
+│   ├── rerankers/cross_encoder.py
 │   ├── search/bm25.py
 │   ├── search/semantic.py
+│   ├── search/vector_index.py
 │   ├── stores/memory.py
 │   ├── stores/sqlite_profile.py
 │   ├── stores/sqlite_receipt.py
@@ -79,6 +84,8 @@ evaluation ────────────────→ domain + search a
 | `application/runtime.py` | 消费 LangGraph 更新并映射 SSE/Receipt | 创建具体基础设施 |
 | `application/workflow.py` | 定义并编译 Fast Path StateGraph | HTTP 和具体搜索引擎 SDK |
 | `application/recall.py` | 选择召回工具、并行调用和 RRF | 具体搜索引擎 SDK |
+| `application/semantic.py` | Embedding/VectorIndex 端口和版本不变量 | 具体模型 SDK 与文件格式 |
+| `application/reranking.py` | Challenger/Active 语义复核编排和降级 | 模型加载与最终 ACL 裁决 |
 | `application/tool_registry.py` | 将工具注册到 ToolNode，并通过 ToolRuntime 注入可信上下文 | 具体搜索实现和模型工具选择策略 |
 | `application/constraints.py` | 硬约束与最终目录复核 | 自然语言约束猜测 |
 | `application/evidence.py` | 基于已验证事实生成确定性解释 | 自由生成目录外事实 |
@@ -87,6 +94,9 @@ evaluation ────────────────→ domain + search a
 | `application/receipt.py` | Receipt 模型和持久化端口 | 数据库实现 |
 | `config/settings.py` | 环境变量校验、安全配置摘要和 Provider 开关 | Prompt、业务规则或 SDK 调用 |
 | `infrastructure/search/bm25.py` | 阶段 0 BM25 和确定性过滤 | HTTP 路由、Session 管理 |
+| `infrastructure/search/vector_index.py` | 版本化精确向量索引、增量同步和目录适配 | 线上排序开关与权限真值 |
+| `infrastructure/embeddings/sentence_transformer.py` | 可选本地开源 Embedding 权重适配 | 索引持久化和业务过滤 |
+| `infrastructure/rerankers/cross_encoder.py` | 可选 Cross-Encoder 推理适配与可用性错误映射 | 候选生成和约束放宽 |
 | `infrastructure/catalog.py` | JSONL 数据加载和质量检查 | Agent 编排 |
 | `infrastructure/stores/memory.py` | 测试替身及本地 Cancellation、Exposure、行为聚合适配器 | 生产持久化承诺 |
 | `infrastructure/stores/sqlite_profile.py` | 单实例长期画像持久化、租户隔离和删除 | 隐式画像推断 |
@@ -99,7 +109,7 @@ evaluation ────────────────→ domain + search a
 | `infrastructure/llm/openai.py` | 根据安全配置创建 LangChain `ChatOpenAI` | Prompt 与领域决策 |
 | `interfaces/http/api.py` | FastAPI、SSE 和 HTTP 校验 | 业务排序和权限推断 |
 | `interfaces/http/static/*` | 模型调用与 Fast Path 的浏览器测试台 | API Key、业务规则或服务端状态 |
-| `interfaces/cli.py` | 离线质量、搜索和评测命令 | 在线服务状态 |
+| `interfaces/cli.py` | 离线质量、搜索、评测和向量索引命令 | 在线服务状态 |
 | `evaluation/metrics.py` | Recall、MRR、NDCG | 在线请求处理 |
 | `bootstrap.py` | 读取配置和装配依赖 | 领域规则 |
 

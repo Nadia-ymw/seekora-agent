@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from ..config.defaults import DEFAULT_CATALOG_RELATIVE_PATH
 from ..domain.models import GoldenQuery, Item
+
+
+DEFAULT_CATALOG_PATH = Path(DEFAULT_CATALOG_RELATIVE_PATH)
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+def resolve_catalog_path(path: str | Path = DEFAULT_CATALOG_PATH) -> Path:
+    """把配置中的相对目录固定解析到项目根，避免入口工作目录改变数据快照。"""
+    resolved = Path(path).expanduser()
+    return resolved if resolved.is_absolute() else PROJECT_ROOT / resolved
 
 
 def _read_jsonl(path: str | Path) -> Iterable[dict]:
@@ -20,7 +32,34 @@ def _read_jsonl(path: str | Path) -> Iterable[dict]:
 
 
 def load_items(path: str | Path) -> list[Item]:
-    return [Item.from_dict(raw) for raw in _read_jsonl(path)]
+    source = Path(path)
+    if not source.is_file():
+        raise FileNotFoundError(
+            f"catalog file does not exist: {source}. "
+            "Run prepare-kuaisearch or explicitly configure SEEKORA_CATALOG_PATH."
+        )
+    items = [Item.from_dict(raw) for raw in _read_jsonl(source)]
+    if not items:
+        raise ValueError(f"catalog file contains no valid items: {source}")
+    seen: set[str] = set()
+    duplicate_ids: set[str] = set()
+    for item in items:
+        if item.item_id in seen:
+            duplicate_ids.add(item.item_id)
+        seen.add(item.item_id)
+    if duplicate_ids:
+        preview = ", ".join(sorted(duplicate_ids)[:5])
+        raise ValueError(f"catalog contains duplicate item_id values: {preview}")
+    return items
+
+
+def catalog_snapshot_sha256(path: str | Path) -> str:
+    """计算原始 JSONL 快照哈希，供运行日志、Receipt 和索引元数据复用。"""
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def load_golden_queries(path: str | Path) -> list[GoldenQuery]:

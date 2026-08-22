@@ -24,6 +24,7 @@ class RecallCall:
     source_version: str
     error_code: str | None = None
     retryable: bool = False   # 是否可重试
+    metadata: dict[str, Any] | None = None  # Challenger 等不参与融合的审计信息
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class RecallOrchestrator:
         tools: Sequence[BaseTool],
         source_tools: tuple[str, ...] = ("catalog_search", "vector_search"),
         rrf_k: int = 60,   # 设置RRF参数
+        source_weights: dict[str, float] | None = None,
     ) -> None:
         # 工具统一注册到 LangGraph ToolNode，不再由编排器手工执行 BaseTool。
         self.registry = LangChainToolRegistry(tools)
@@ -57,6 +59,9 @@ class RecallOrchestrator:
             raise ValueError(f"missing recall tools: {', '.join(missing)}")
         self.source_tools = source_tools
         self.rrf_k = rrf_k
+        self.source_weights = dict(source_weights or {})
+        if any(weight <= 0 for weight in self.source_weights.values()):
+            raise ValueError("RRF source weights must be positive")
     # 单工具调用
     async def _invoke(
         self,
@@ -76,8 +81,13 @@ class RecallOrchestrator:
                 source_version="unknown",
                 error_code=execution.error_code,
                 retryable=execution.error_code == "TOOL_TRANSIENT_ERROR",
+                metadata=None,
             )
         output = execution.output
+        metadata = dict(output.get("metadata", {}))
+        retrieval_source = str(metadata.get("retrieval_source", tool_name))
+        # Receipt 保存实际融合权重，便于复现实验与排查排序差异。
+        metadata["rrf_weight"] = self.source_weights.get(retrieval_source, 1.0)
         return RecallCall(
             tool=tool_name,
             arguments=arguments,
@@ -87,6 +97,7 @@ class RecallOrchestrator:
             source_version=str(output.get("source_version", "unknown")),
             error_code=output.get("error_code"),
             retryable=bool(output.get("retryable", False)),
+            metadata=metadata,
         )
 
     async def recall(
@@ -123,15 +134,19 @@ class RecallOrchestrator:
         for call in successful:
             for rank, candidate in enumerate(call.data.get("candidates", []), start=1):
                 item_id = str(candidate["item_id"])
+                # 语义工具显式标记 qwen/tfidf/fallback，Receipt 与最终候选可证明实际来源。
+                candidate_source = str(candidate.get("source", call.tool))
                 entry = fused.setdefault(item_id, {
                     "title": str(candidate["title"]),
                     "score": 0.0,
                     "source_scores": {},
                     "reasons": [],
                 })
-                entry["score"] += 1.0 / (self.rrf_k + rank)
-                entry["source_scores"][call.tool] = float(candidate["score"])
-                entry["reasons"].append(f"recalled_by:{call.tool}")
+                entry["score"] += self.source_weights.get(candidate_source, 1.0) / (
+                    self.rrf_k + rank
+                )
+                entry["source_scores"][candidate_source] = float(candidate["score"])
+                entry["reasons"].append(f"recalled_by:{candidate_source}")
         # 排序
         ranked = [
             FusedCandidate(

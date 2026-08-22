@@ -28,6 +28,8 @@ Seekora 由 `Seek`（探索与检索）和 `Aurora`（照亮信息）组合而�
 - Session Intent 与长期 Profile 分离，个性化和行为存储默认关闭并要求显式授权。
 - 多轮会话由结构化 AI 生成 ConstraintPatch、确定性 Reducer 执行，支持修改、追加、删除和清空，并保留规则降级。
 - Constraint 支持作用域、来源、轮次、状态、优先级和过期时间；支持跨轮过期、跨类目挂起/恢复、冲突检测及需确认的最小放宽建议。
+- 定义 Embedding/VectorIndex 端口和版本化增量向量索引，并提供本地 SentenceTransformer Embedding Challenger。
+- LangGraph 增加无训练 Cross-Encoder 语义复核节点；Challenger 记录分数但不改变 RRF，失败时确定性降级。
 - 用户画像查询、授权、显式偏好更新和删除 API，支持租户隔离。
 - SQLite 持久化长期画像，服务重启后保留显式授权和偏好。
 - 曝光/点击等行为事件的授权写入、幂等去重、删除传播和 ACL 安全行为召回。
@@ -58,9 +60,9 @@ python -m pip install -e ".[dev]"
 ```powershell
 cd seekora-agent
 $env:PYTHONPATH = "src"
-python -m seekora_agent.interfaces.cli quality --catalog data/sample/items.jsonl
-python -m seekora_agent.interfaces.cli search --catalog data/sample/items.jsonl --query "8000元以内适合编程的轻薄本"
-python -m seekora_agent.interfaces.cli evaluate --catalog data/sample/items.jsonl --golden data/golden/queries.jsonl --output reports/baseline.json
+python -m seekora_agent.interfaces.cli quality
+python -m seekora_agent.interfaces.cli search --query "8000元以内适合编程的轻薄本"
+python -m seekora_agent.interfaces.cli evaluate --golden data/golden/queries.jsonl --output reports/baseline.json
 python -m unittest discover -s tests -v
 ```
 
@@ -71,6 +73,10 @@ python -m uvicorn seekora_agent.bootstrap:app --host 127.0.0.1 --port 8000
 ```
 
 启动后打开 `http://127.0.0.1:8000/` 使用 Web 测试台。
+
+CLI、API 和 Web 测试台默认读取
+`data/processed/kuaisearch-electronics/items.jsonl`；最小样例仅在显式传入
+`--catalog data/sample/items.jsonl` 或设置 `SEEKORA_CATALOG_PATH` 时启用。
 
 发送流式查询：
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "seekora-agent"
-version = "0.21.0"
+version = "0.22.0"
 description = "A grounded search and recommendation agent baseline"
 requires-python = ">=3.11"
 dependencies = [
@@ -18,6 +18,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["httpx>=0.27,<1"]
+semantic = [
+  "sentence-transformers>=5.7,<6",
+  "sqlite-vec>=0.1.6,<0.2",
+]
 
 [project.scripts]
 seekora-agent = "seekora_agent.interfaces.cli:main"

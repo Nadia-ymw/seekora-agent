@@ -1,9 +1,11 @@
 # 技术路线实现状态与后续开发规划
 
+> **范围更新（2026-08-21）：** 项目当前不接入正式业务数据、不进行多实例扩展且暂不上线。后续开发请以[《单实例本地 MVP 后续开发规划》](local-mvp-development-plan.md)为当前执行依据；本文 A～I 增量保留为完整技术路线参考，不再作为当前排期。
+>
 > 对照文档：仓库根目录《搜索推荐Agent技术路线.md》v1.1  
-> 评估日期：2026-08-20  
-> 当前项目版本：0.21.0  
-> 验证基线：`nanobot` 环境 111 个自动化测试通过
+> 评估日期：2026-08-21
+> 当前项目版本：0.22.0
+> 验证基线：`nanobot` 环境 122 个自动化测试通过
 
 ## 1. 结论
 
@@ -14,7 +16,7 @@
 但按技术路线的“门禁”而不是按“是否存在代码”判断，当前准确位置是：
 
 - **Phase 0：部分完成，正式门禁未通过。** 已有样例目录、KuaiSearch 转换、15 条样例 Golden Query 和基础指标；缺少 300～500 条人工金集、正式业务指标、真实数据质量验收和延迟预算。
-- **Phase 1：本地工程闭环基本完成，质量/性能门禁未通过。** Fast Path、约束、RRF、详情和证据、多轮修改已实现；向量召回仍是 TF-IDF 开发替身，开源 Cross-Encoder/在线轻量重排服务和正式性能验证未完成。
+- **Phase 1：本地工程闭环基本完成，质量/性能门禁未通过。** Fast Path、约束、RRF、详情和证据、多轮修改已实现；Embedding/Cross-Encoder 的开源模型适配、版本化索引和 Challenger 审计已实现，但 TF-IDF/RRF 仍是默认路径，真实权重对照评测和正式性能验证未完成。
 - **Phase 2：核心编排基本完成，外部检索与验收未完成。** Probe、复杂度路由、结构化计划、有界 DAG、一次 Replan、澄清和拒答已实现；外部 `web_search` Tool 适配、跨源证据安全和复杂集对照评测未实现。
 - **Phase 3：完成前半段。** Session/Profile 分离、Consent、SQLite 长期画像、反馈归因、行为召回和排序评测数据契约已实现；预训练小模型评测、Shadow、Canary、A/B 和生产数据闭环未实现。
 - **Phase 4：尚未开始。** 共享 Backbone、生成式召回、蒸馏、广告链路和轨迹级优化均应继续保持实验性。
@@ -39,8 +41,8 @@
 | 单主 Agent | 已实现 | `AgentRuntime` + LangGraph 工作流统一管理预算、工具、结果和 Receipt | 缺少生产认证网关和分布式追踪 |
 | Fast/Deep 双路径 | 已实现 | 复杂度路由、Fast Path、Probe、结构化 Planner、DAG、Replan | 路由置信度未用人工金集校准 |
 | 通用 LLM 理解 | 部分实现 | 可选 LangChain ChatModel 解析 Intent 和 Session Patch，失败回退规则 | 没有 Provider 指标、熔断和 Prompt 版本持久化 |
-| 专用小模型/重排 | 未实现 | 已有可复用的曝光行为评测数据契约 | 尚未接入开源 Cross-Encoder 或在线轻量模型服务；不规划 LTR 训练 |
-| 传统检索推荐 | 部分实现 | BM25、TF-IDF 语义替身、行为加权、RRF | 没有 OpenSearch/ANN、CF/序列模型和正式特征服务 |
+| 专用小模型/重排 | 部分实现 | Cross-Encoder 端口、本地开源适配器、LangGraph Challenger 节点和 RRF 降级 | 未在正式人工集上证明增益，不能切为 Active；不规划 LTR 训练 |
+| 传统检索推荐 | 部分实现 | BM25、TF-IDF、Embedding 端口/精确索引 Challenger、行为加权、RRF | 没有生产 ANN、CF/序列模型和正式特征服务 |
 | Working State | 已实现 | LangGraph State、预算、取消和节点状态 | 仅单进程执行 |
 | Session State | 已实现（单实例） | SQLite 保存最近意图和消息，支持 TTL、裁剪、版本冲突与重启恢复 | 缺少语义摘要和多副本共享状态 |
 | Constraint Store | 基本实现 | 结构化硬约束、Session 合并、Scope、来源、状态、过期、冲突和确认式最小放宽 | 类目字段适用矩阵和正式人工集门槛仍待补齐 |
@@ -55,10 +57,10 @@
 |---|---|---|
 | Intent、硬约束、软/负偏好解析 | 已实现 | 规则和可选结构化 LLM；支持失败回退 |
 | 字段与权限校验 | 已实现 | ToolRuntime 注入可信租户/用户/ACL，Constraint Engine 最终复核 |
-| 关键词、向量、行为并行召回 | 部分实现 | 三路 Tool 和并行调用已完成；“向量”为 TF-IDF，行为为轻量加权 |
+| 关键词、向量、行为并行召回 | 部分实现 | 三路 Tool 和并行调用已完成；Embedding Challenger 只做 Shadow，默认向量结果仍为 TF-IDF |
 | 融合、去重、硬约束 | 已实现 | RRF、canonical item_id、Catalog 复核和过滤原因 |
-| 预训练小模型重排 | 未实现 | 当前仅有 RRF 和行为提升 | 接入开源 Cross-Encoder 或在线轻量模型服务，并提供确定性降级 |
-| Top-K 语义复核 | 未实现 | 尚无 Cross-Encoder/在线重排服务 |
+| 预训练小模型重排 | 部分实现 | 可选 SentenceTransformer Cross-Encoder Challenger、独立分数和确定性 RRF 降级 | 缺真实权重质量/延迟/成本报告，环境配置禁止 Active |
+| Top-K 语义复核 | 部分实现 | LangGraph `rerank` 节点复核 Top 1～50，失败可审计 | 尚未通过正式门禁 |
 | Top-K 证据解释 | 已实现（目录证据） | Item Detail + EvidenceComposer，不由模型补写事实 |
 | 多轮修改约束 | 已实现 | AI 仅生成白名单 Patch，确定性 Reducer 执行 |
 
@@ -80,9 +82,9 @@
 | 契约 | 当前状态 | 已有字段 | 仍需补充 |
 |---|---|---|---|
 | Intent | 部分实现 | mode、domain、retrieval_query、hard/soft/negative、confidence、ambiguities | entities、sort_goal、Top-N intent |
-| Constraint | 部分实现 | field、operator、value | scope、source、source_turn、confidence、status、expires_at |
+| Constraint | 基本实现 | field、operator、value、scope、source、source_turn、confidence、status、priority、expires_at | 正式字段/单位字典和人工集门禁 |
 | Plan | 基本实现 | route 原因、步骤、依赖、修订、Replan 上限 | 字段级 filters、证据覆盖停止条件、外部源策略 |
-| Candidate | 已实现 | item_id、融合分、来源分、原因、constraint_pass | 预训练小模型重排分、semantic judge 和多样性分数 |
+| Candidate | 基本实现 | item_id、融合分、来源分、原因、constraint_pass、独立 rerank_score/mode | 多样性分数和正式语义复核门禁 |
 | Evidence | 已实现（站内目录） | field、value、source_uri、observed_at、trust_level | 评论/政策/Web 证据、动态字段实时复核和冲突证据 |
 
 ## 6. 模块实现状态
@@ -100,11 +102,14 @@
 - 曝光行为排序评测样本、成熟窗口、曝光时特征和时间切分契约；
 - Item Detail、目录证据和确定性解释；
 - KuaiSearch-Lite 电子商品转换及合成测试属性标记；
-- 111 个单元、契约、应用和接口自动化测试。
+- Embedding/VectorIndex 端口、版本化精确向量索引、内容哈希增量同步和构建 CLI；
+- SentenceTransformer Embedding/Cross-Encoder 可选适配器、Challenger 审计和确定性降级；
+- 122 个单元、契约、应用和接口自动化测试。
 
 ### 6.2 部分实现或开发态替身
 
-- `vector_search` 是内存 TF-IDF 余弦，不是 Embedding + ANN；
+- `vector_search` 默认仍返回内存 TF-IDF；Embedding 使用本地精确索引并只处于 Challenger，不是生产 ANN；
+- Cross-Encoder 只记录 Challenger 分数，不改变 RRF 顺序；
 - `behavior_recall` 是授权行为加权，不是 ItemCF/UserCF/Swing/序列模型；
 - Catalog、Exposure 和行为聚合 Store 仍主要在内存；Session 与 Receipt 已迁移到 SQLite；
 - Profile、请求回放和事件队列使用 SQLite，仅面向本地/单实例；
@@ -116,8 +121,7 @@
 ### 6.3 尚未实现
 
 - 外部 `web_search` Tool 及外部证据安全链路；
-- 正式 Embedding/ANN 检索和索引版本管理；
-- Top-K Cross-Encoder 或小模型语义复核；
+- 生产 ANN 检索以及真实 Embedding/Cross-Encoder 权重的正式质量、性能和成本门禁；
 - 约束单位字典、完整类目适用矩阵和人工集量化门禁；
 - OpenTelemetry Trace、指标采集和告警；
 - 持久化 Exposure 和行为聚合，并为多副本部署替换共享 Session/Receipt Store；
@@ -136,7 +140,7 @@
 | Intent/Constraint/Plan/Candidate/Evidence Schema | 部分实现 | 主链路字段具备，完整生命周期字段不足 |
 | 五类只读工具 | 部分实现 | 4/5，缺少 `web_search` |
 | 快慢路由与 Probe | 已实现 | 缺真实复杂集验收 |
-| 约束、融合、Top-K 语义复核 | 部分实现 | 约束与融合完成，语义复核缺失 |
+| 约束、融合、Top-K 语义复核 | 部分实现 | 约束与融合完成，语义复核处于未验收 Challenger |
 | Session Store、Profile API、关闭个性化 | 已实现（单实例） | Session 与 Profile 均使用 SQLite，API 完成 |
 | Trace/Receipt、反馈、离线回放、Dashboard | 部分实现 | Receipt/反馈完成；轨迹回放与 Dashboard 缺失 |
 | 超时、熔断、降级、拒答、注入测试 | 部分实现 | 预算/降级/拒答已有；硬超时、熔断和系统安全测试缺失 |
@@ -315,12 +319,13 @@ A～H 门禁通过后 → I 高级模型实验（不含 LTR 训练）
 
 ## 11. 下一开发增量
 
-增量 C 的首个 Constraint 生命周期切片已经完成：元数据、Session 状态转换、过期、跨类目挂起/恢复、冲突检测、确认式最小放宽以及 SSE/Receipt 审计均已接入。Exposure 与行为聚合持久化继续保留在增量 B 的后续清单。
+增量 D 的首个工程切片已经完成：Embedding/VectorIndex 端口、版本化精确向量索引、内容哈希增量更新 CLI、SentenceTransformer Embedding/Cross-Encoder 适配器、LangGraph `rerank` 节点、Challenger 审计和 TF-IDF/RRF 降级均已接入。默认路径未改变。
 
-下一步执行 **增量 D：真实语义召回与无训练语义复核**；在首批正式人工集可用前，新的 Embedding/Cross-Encoder 仅作为 Challenger，不替换默认 TF-IDF/RRF 路径。
+下一步继续执行 **增量 D 的固定快照对照评测切片**：
 
-增量 C 后续门禁债务包括：
+1. 扩展评测 CLI，在相同 Catalog/Golden Set 上输出 BM25、TF-IDF、Embedding、RRF 和 Cross-Encoder 分组指标；
+2. 固定模型、索引、数据和配置版本，并记录 TP50/TP95、峰值内存和构建耗时；
+3. 增加 Challenger 差异报告，定位新增、丢失和顺序变化的 Query；
+4. 首批正式人工集可用前保持 Challenger；没有稳定增益或超出预算时不得切换默认路径。
 
-1. 用正式字段字典替换当前电子数码类目的最小适用矩阵；
-2. 增加单位归一化与更多组合属性测试；
-3. 在人工集上量化硬约束满足率、冲突发现率和放宽建议接受率。
+增量 B 的 Exposure/行为聚合 SQLite 化，以及增量 C 的正式字段/单位字典仍作为并行门禁债务保留。

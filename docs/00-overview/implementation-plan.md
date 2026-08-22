@@ -182,7 +182,7 @@ POST /agent/query
 
 负责组装默认应用：
 
-1. 从 `SEEKORA_CATALOG_PATH` 或样例路径加载目录；
+1. 从 `SEEKORA_CATALOG_PATH` 或默认 `data/processed/kuaisearch-electronics/items.jsonl` 加载目录；
 2. 建立 BM25 基线；
 3. 使用 `@tool` 创建 `catalog_search`、`vector_search` 与 `behavior_recall`，注册到 `ToolNode`；
 4. 创建 RecallOrchestrator 并装配三个召回工具，匿名请求跳过行为工具；
@@ -196,7 +196,7 @@ POST /agent/query
 - `tests/test_runtime.py`：验证预算上限、工具重名、事件顺序、Session 写入、Receipt 和取消；
 - `tests/test_api.py`：验证健康检查、SSE 查询、Receipt 查询和非法请求 422。
 
-当前共 111 个自动化测试，统一在 `nanobot` Conda 环境执行。其中 LLM 边界测试使用假的 LangChain Runnable，不访问外部 API。
+当前共 122 个自动化测试，统一在 `nanobot` Conda 环境执行。其中 LLM 和语义模型边界测试使用假的 Runnable/模型端口，不访问外部 API。
 
 ### 7.9 可选 LLM 意图解析增量
 

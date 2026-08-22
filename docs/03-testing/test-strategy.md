@@ -1,11 +1,18 @@
 # 测试策略
 
+当前 5 万商品的本地暖态性能观测、测量边界和优化优先级见[本地并行召回与 SQLite 向量索引性能报告](local-recall-performance-report.md)。该报告属于工程基线，不替代正式 TP95/负载门禁。
+
 ## 当前测试分层
 
 | 文件 | 层级 | 覆盖重点 |
 |---|---|---|
 | `tests/test_baseline.py` | 单元测试 | 中文 Token、硬约束、权限和排序 |
 | `tests/test_evaluation.py` | 单元测试 | Recall、MRR、NDCG 正确性 |
+| `data/golden/processed-recall-queries.jsonl` | 固定查询集 | processed 快照上的双路 RRF 质量与稳定性门禁 |
+| `tests/test_cli.py` | 单元测试 | SQLite 索引与 `compare-recall` 参数契约 |
+
+本轮 M3 的检索设计、完整测试分类、通过/失败指标和复现方式见
+[M3 搜索推荐检索策略与测试说明报告](m3-search-retrieval-development-summary.md)。
 | `tests/test_runtime.py` | 应用集成测试 | 预算、Registry、事件、Session、Receipt 和取消 |
 | `tests/test_api.py` | 接口测试 | 健康检查、Web 页面、安全公共配置、Pydantic、SSE 和 Receipt API |
 | `tests/test_fast_path.py` | Fast Path 集成测试 | 意图、双路召回、RRF、约束和 Receipt |
@@ -26,8 +33,9 @@
 | `tests/test_constraint_lifecycle.py` | 约束生命周期测试 | 元数据兼容、组合边界、过期、类目挂起/恢复、冲突和确认式放宽 |
 | `tests/test_llm_session_context.py` | 多轮 AI 边界测试 | 结构化 Patch、规则降级和非法安全字段拦截 |
 | `tests/test_kuaisearch.py` | 外部目录转换测试 | 类目过滤、Schema 映射、合成测试属性、确定性采样和路径保护 |
+| `tests/test_semantic_retrieval.py` | 语义模型契约测试 | 索引版本/增量、ACL、Embedding Shadow、Cross-Encoder Challenger 和降级 |
 
-当前共 111 个测试。测试必须在安装项目依赖的 Python 环境执行。
+当前共 122 个测试。测试必须在安装项目依赖的 Python 环境执行。
 
 ## 必须保持的不变量
 
@@ -36,6 +44,8 @@
 - 未注册或重名工具被明确拒绝；
 - 租户、用户、ACL 和 ToolRuntime 不得出现在模型可见工具 Schema 中；
 - 网络等临时工具故障允许降级，程序错误必须继续抛出而不能被静默吞掉；
+- Embedding/Cross-Encoder Challenger 不得改变默认 RRF 顺序、冒充召回来源或引入新 item_id；
+- 向量索引必须校验模型版本和维度，向量命中仍需经过可信 Catalog、租户和 ACL 复核；
 - 工具调用不能超过预算；
 - 成功、取消和失败请求均生成 Receipt；
 - 非法 HTTP 请求在进入 Runtime 前被拒绝；

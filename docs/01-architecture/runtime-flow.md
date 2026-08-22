@@ -16,6 +16,7 @@ POST /agent/query
 → application/tool_registry.py：ToolNode 注入可信 Runtime 并执行工具
 → infrastructure/search/*：关键词和语义召回
 → recall 节点：RRF 融合
+→ rerank 节点：可选 Cross-Encoder Challenger 复核；默认不改 RRF 顺序
 → apply_constraints 节点：硬约束与 Catalog 最终复核
 → assess_sufficiency 节点：判断返回、一次 Replan、澄清或拒答
 → enrich_result 节点：批量 Item Detail 与 ACL 复核
@@ -30,6 +31,8 @@ POST /agent/query
 request.accepted → intent.resolved → routing.completed → recall.started → recall.completed
 → constraints.applied → item_details.completed → result → done
 ```
+
+启用 Cross-Encoder Challenger 时，`recall.completed` 后增加 `rerank.completed`。Embedding Challenger 不新增召回源，而是把 Shadow 候选、分数、版本、耗时和重叠数写入 `vector_search` 的非融合 metadata 与 Receipt。
 
 发生多轮合并时，`intent.resolved` 前会增加 `session.context_applied`，其中只记录结构化 Patch 和合并摘要，不包含模型思维链。
 

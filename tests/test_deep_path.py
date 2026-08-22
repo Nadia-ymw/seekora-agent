@@ -31,7 +31,7 @@ class ComplexityRouterTest(unittest.TestCase):
 
 class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
     async def test_deep_path_streams_probe_plan_and_persists_receipt(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="编程",
             tenant_id="demo",
@@ -53,7 +53,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(5, len(receipt.tool_calls))
 
     async def test_fast_path_does_not_pay_probe_cost(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="轻薄笔记本",
             tenant_id="demo",
@@ -67,7 +67,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(3, len(receipt.tool_calls))
 
     async def test_non_laptop_category_uses_deep_path_and_returns_catalog_item(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="推荐1000元以内适合通勤的主动降噪耳机",
             tenant_id="demo",
@@ -81,7 +81,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("aud-005", [item["item_id"] for item in result.data["items"]])
 
     async def test_many_laptop_constraints_trigger_deep_path(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="推荐8000元以内内存32GB以上重量1.4kg以内的轻薄笔记本",
             tenant_id="demo",
@@ -95,7 +95,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(["lap-001"], [item["item_id"] for item in result.data["items"]])
 
     async def test_impossible_constraints_return_empty_grounded_result(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="推荐200元以内内存32GB以上重量1kg以内的轻薄笔记本",
             tenant_id="demo",
@@ -122,7 +122,7 @@ class DeepPathIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(len(receipt.tool_calls), 8)
 
     async def test_unsupported_ambiguous_query_requests_clarification(self):
-        runtime = build_runtime()
+        runtime = build_runtime(catalog_path="data/sample/items.jsonl")
         events = [event async for event in runtime.run(AgentQuery(
             query="夸克熵泵",
             tenant_id="demo",
